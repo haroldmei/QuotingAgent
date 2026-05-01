@@ -61,10 +61,12 @@ if [[ "$status" != "200" ]]; then
 fi
 echo "  ↳ token + project ok"
 
-# Build the patch body. sms_test_otp format per Management API docs:
-#   "{phone}:{otp}" pairs joined by commas (we set just one).
+# Build the patch body. sms_test_otp format per Management API:
+#   comma-separated "phone=code" pairs, with phones in E.164 *without* the
+#   leading + sign (Supabase strips it server-side).
+PHONE_NO_PLUS="${E2E_TEST_PHONE#+}"
 PATCH_BODY=$(jq -n \
-  --arg pair "${E2E_TEST_PHONE}:${E2E_TEST_OTP_SECRET}" \
+  --arg pair "${PHONE_NO_PLUS}=${E2E_TEST_OTP_SECRET}" \
   --arg until "2099-12-31T23:59:59Z" \
   '{ sms_test_otp: $pair, sms_test_otp_valid_until: $until }')
 

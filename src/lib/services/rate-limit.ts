@@ -51,6 +51,23 @@ export function getRedis(): Redis {
   return _redis;
 }
 
+/**
+ * Like getRedis() but returns null when env is unset, so callers in non-prod
+ * environments can degrade caching gracefully (cache miss → recompute).
+ * Honours the same staging exemption as createRateLimiter.
+ */
+export function getRedisOptional(): Redis | null {
+  if (!hasUpstashConfig()) {
+    const isProdRuntime =
+      process.env.NODE_ENV === "production" && process.env.STAGE !== "staging";
+    if (isProdRuntime) {
+      throw new Error("Upstash Redis env vars required in production.");
+    }
+    return null;
+  }
+  return getRedis();
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------

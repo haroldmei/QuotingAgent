@@ -13,9 +13,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { createServerClient, createServiceClient } from "@/lib/db/supabase-server";
+import { createRateLimiter, getRedisOptional } from "@/lib/services/rate-limit";
 import {
   LicenceValidateReqSchema,
   type LicenceValidateRes,
@@ -23,17 +22,7 @@ import {
 import { validateNswLicence } from "@/lib/auth/nsw-licence";
 import { logger } from "@/lib/logger";
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-const licenceLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(30, "1h"),
-  prefix: "rl:licence:validate",
-  analytics: false,
-});
+const licenceLimiter = createRateLimiter("rl:licence:validate", 30, "1h");
 
 export async function POST(req: NextRequest) {
   // Auth
@@ -83,11 +72,14 @@ export async function POST(req: NextRequest) {
 
   const { nsw_licence_number } = parse.data;
 
-  // Check Redis cache (24h TTL per §7.2 of system design)
+  // Check Redis cache (24h TTL per §7.2 of system design); null in staging
+  const redis = getRedisOptional();
   const cacheKey = `licence:${nsw_licence_number}`;
-  const cached = await redis.get<LicenceValidateRes>(cacheKey);
-  if (cached) {
-    return NextResponse.json(cached, { status: 200 });
+  if (redis) {
+    const cached = await redis.get<LicenceValidateRes>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, { status: 200 });
+    }
   }
 
   // Call Service NSW API
@@ -112,7 +104,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Cache the result for 24h
-  if (result.valid) {
+  if (result.valid && redis) {
     await redis.set(cacheKey, result, { ex: 86400 });
   }
 

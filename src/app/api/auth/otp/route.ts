@@ -19,9 +19,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { createServerClient } from "@/lib/db/supabase-server";
+import { createRateLimiter } from "@/lib/services/rate-limit";
 import {
   OtpStartReqSchema,
   OtpVerifyReqSchema,
@@ -31,26 +30,10 @@ import {
 import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
-// Rate limiters
+// Rate limiters (factory honours STAGE=staging → no-op when Upstash unset)
 // ---------------------------------------------------------------------------
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-const otpStartLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "1h"),
-  prefix: "rl:otp:start",
-  analytics: false,
-});
-
-const otpVerifyLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, "1h"),
-  prefix: "rl:otp:verify",
-  analytics: false,
-});
+const otpStartLimiter = createRateLimiter("rl:otp:start", 5, "1h");
+const otpVerifyLimiter = createRateLimiter("rl:otp:verify", 10, "1h");
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/otp
