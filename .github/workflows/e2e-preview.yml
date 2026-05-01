@@ -1,0 +1,134 @@
+name: E2E against Vercel preview
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override the URL to test against (default: deploy a fresh preview)"
+        required: false
+        default: ""
+
+concurrency:
+  group: e2e-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-and-test:
+    name: Deploy + run Playwright (auth-gated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers + Linux deps
+        run: pnpm exec playwright install --with-deps chromium
+
+      # ----------------------------------------------------------------
+      # Path A — deploy a fresh Vercel preview from this commit.
+      #         Used on PRs and `main` pushes when no override URL given.
+      # ----------------------------------------------------------------
+      - name: Pull Vercel project config
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: pnpm exec vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build for preview
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: pnpm exec vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview
+        if: ${{ github.event.inputs.base_url == '' }}
+        id: deploy
+        run: |
+          url=$(pnpm exec vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: $url"
+
+      - name: Pick base URL
+        id: base
+        run: |
+          if [ -n "${{ github.event.inputs.base_url }}" ]; then
+            echo "url=${{ github.event.inputs.base_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${{ steps.deploy.outputs.url }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for preview to respond
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.base.outputs.url }}/" || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "Preview is live (HTTP $code)"
+              exit 0
+            fi
+            echo "  attempt $i: HTTP $code, retrying..."
+            sleep 5
+          done
+          echo "Preview did not respond with 200 within 5 minutes" >&2
+          exit 1
+
+      # ----------------------------------------------------------------
+      # Run Playwright. Auth-gated tests pick up E2E_TEST_PHONE/SECRET.
+      # SKIP_WEB_SERVER=1 tells playwright.config.ts not to spawn its own
+      # dev server (we're testing the deployed preview).
+      # ----------------------------------------------------------------
+      - name: Run Playwright
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.base.outputs.url }}
+          SKIP_WEB_SERVER:     "1"
+          E2E_TEST_PHONE:      ${{ secrets.E2E_TEST_PHONE }}
+          E2E_TEST_OTP_SECRET: ${{ secrets.E2E_TEST_OTP_SECRET }}
+          E2E_PROD_BUILD:      "1"
+          CI:                  "true"
+        run: pnpm exec playwright test --project=desktop-chrome --reporter=list,html
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload screenshots/traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: test-results/
+          retention-days: 14
+
+      - name: Comment preview URL on PR
+        if: ${{ github.event_name == 'pull_request' && github.event.inputs.base_url == '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.base.outputs.url }}';
+            const status = '${{ job.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `${emoji} **E2E preview** — ${status}\n\n- Preview URL: ${url}\n- Report: see the **playwright-report** artifact on this run.`,
+            });

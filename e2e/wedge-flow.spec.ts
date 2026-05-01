@@ -28,7 +28,7 @@ import {
 // ---------------------------------------------------------------------------
 test.describe("CF-1: Ready-to-Quote tray", () => {
   test("empty state shows 'No leads yet' and Add lead CTA", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await mockLeadsList(page, []);
     await page.goto("/leads");
@@ -41,7 +41,7 @@ test.describe("CF-1: Ready-to-Quote tray", () => {
   });
 
   test("tray renders lead cards sorted newest-first", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     const now = new Date().toISOString();
     const older = new Date(Date.now() - 86_400_000).toISOString();
@@ -62,7 +62,7 @@ test.describe("CF-1: Ready-to-Quote tray", () => {
   });
 
   test("status filter tabs are rendered", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await mockLeadsList(page, []);
     await page.goto("/leads");
@@ -74,7 +74,7 @@ test.describe("CF-1: Ready-to-Quote tray", () => {
   });
 
   test("add new lead button is accessible in top bar", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await mockLeadsList(page, []);
     await page.goto("/leads");
@@ -88,7 +88,7 @@ test.describe("CF-1: Ready-to-Quote tray", () => {
 // ---------------------------------------------------------------------------
 test.describe("CF-2: Photo capture & upload", () => {
   test("photo capture page shows Take photos as primary CTA", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     // Mock the lead detail fetch
     await page.route("**/api/leads/lead-001", async (route) => {
@@ -117,7 +117,7 @@ test.describe("CF-2: Photo capture & upload", () => {
   });
 
   test("gallery upload button is visible", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await page.route("**/api/leads/lead-001", async (route) => {
       await route.fulfill({
@@ -134,7 +134,7 @@ test.describe("CF-2: Photo capture & upload", () => {
   });
 
   test("context textarea shows correct placeholder", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await page.route("**/api/leads/lead-001", async (route) => {
       await route.fulfill({
@@ -153,7 +153,7 @@ test.describe("CF-2: Photo capture & upload", () => {
   });
 
   test("generate quote button is disabled when no photos are attached", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await page.route("**/api/leads/lead-001", async (route) => {
       await route.fulfill({
@@ -171,7 +171,7 @@ test.describe("CF-2: Photo capture & upload", () => {
   });
 
   test("context note disclaimer appears when field is blank and photos are present", async ({ page: _page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     // This test checks the disclaimer in FR-010 AC4
     // Would require simulating a file upload — skipped until preview deploy
@@ -183,7 +183,7 @@ test.describe("CF-2: Photo capture & upload", () => {
 // ---------------------------------------------------------------------------
 test.describe("CF-3/CF-4: AI quote generation", () => {
   test("generating state screen shows progress indicator", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     // Mock quote endpoint returning a 'generating' status
     await page.route("**/api/quotes/quote-001", async (route) => {
@@ -217,7 +217,7 @@ test.describe("CF-5: Quote review screen", () => {
   // Authenticate-required tests: skip locally, run against seeded preview deploy
   test.beforeEach(async ({ page: _page }) => {
     if (!process.env.E2E_SESSION_COOKIE) {
-      test.skip(true, "CF-5 tests require authenticated seeded preview deploy (set E2E_SESSION_COOKIE)");
+      test.skip(!process.env.E2E_PROD_BUILD, "CF-5 tests require authenticated preview deploy (set E2E_PROD_BUILD=1)");
     }
   });
 
@@ -365,7 +365,7 @@ test.describe("CF-6/CF-7: SMS send screen", () => {
 
   test.beforeEach(async ({ page: _page }) => {
     if (!process.env.E2E_SESSION_COOKIE) {
-      test.skip(true, "CF-6/7 tests require authenticated seeded preview deploy (set E2E_SESSION_COOKIE)");
+      test.skip(!process.env.E2E_PROD_BUILD, "CF-6/7 tests require authenticated preview deploy (set E2E_PROD_BUILD=1)");
     }
   });
 
@@ -704,7 +704,7 @@ test.describe("CF-8: Customer quote view (public, no auth)", () => {
 // ---------------------------------------------------------------------------
 test.describe("Manual lead entry (FR-007)", () => {
   test("new lead sheet is accessible from the leads tray", async ({ page }) => {
-    test.skip(true, "Requires authenticated session — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + seeded preview deploy (set E2E_PROD_BUILD=1)");
 
     await mockLeadsList(page, []);
     await page.goto("/leads");
@@ -719,6 +719,6 @@ test.describe("Manual lead entry (FR-007)", () => {
   });
 
   test("new lead form creates lead and shows in tray", async ({ page: _page }) => {
-    test.skip(true, "Requires authenticated session and live DB — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_PROD_BUILD, "Requires authenticated session + live DB + seeded preview deploy (set E2E_PROD_BUILD=1)");
   });
 });
