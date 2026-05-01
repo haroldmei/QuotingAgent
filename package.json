@@ -21,7 +21,8 @@
     "eval:vision": "promptfoo eval --config evals/vision-quote.config.yaml",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:deploy": "bash scripts/db-migrate.sh",
+    "db:push": "prisma db push --accept-data-loss",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },

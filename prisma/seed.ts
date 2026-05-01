@@ -19,7 +19,7 @@ const prisma = new PrismaClient()
 // Demo crew data (Western Sydney postcodes: 2750 Penrith, 2760 Blacktown, 2171 Parramatta)
 const DEMO_CREWS = [
   {
-    id: 'crew-001-roofer-uuid',
+    id: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     businessName: 'Sydney Roofing Co',
     tradeType: 'roofer' as const,
     nswLicenceNumber: 'L001234567',
@@ -27,7 +27,7 @@ const DEMO_CREWS = [
     abn: '12345678901',
   },
   {
-    id: 'crew-002-painter-uuid',
+    id: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     businessName: 'Penrith Painters Pty Ltd',
     tradeType: 'painter' as const,
     nswLicenceNumber: 'L002345678',
@@ -35,7 +35,7 @@ const DEMO_CREWS = [
     abn: '23456789012',
   },
   {
-    id: 'crew-003-plumber-uuid',
+    id: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     businessName: 'Blacktown Plumbing Services',
     tradeType: 'plumber' as const,
     nswLicenceNumber: 'L003456789',
@@ -46,20 +46,20 @@ const DEMO_CREWS = [
 
 const DEMO_USERS = [
   {
-    id: 'user-001-owner-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: '108018c7-e3c0-509c-a45d-7fb9f43716ea',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     phone: '+61412345678',
     role: 'owner' as const,
   },
   {
-    id: 'user-002-owner-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: '57b90b55-b918-502f-9045-6e14d5706886',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     phone: '+61423456789',
     role: 'owner' as const,
   },
   {
-    id: 'user-003-owner-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: '44c498ad-b439-514e-a546-404098b8b6ea',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     phone: '+61434567890',
     role: 'owner' as const,
   },
@@ -68,8 +68,8 @@ const DEMO_USERS = [
 const DEMO_LEADS = [
   // Crew 001 (Roofer) leads
   {
-    id: 'lead-001-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: 'd4400ef5-8369-50e3-9bad-4a9c95560e6b',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     source: 'da' as const,
     daReference: 'DA-2026-00123',
     customerName: 'John Smith',
@@ -80,8 +80,8 @@ const DEMO_LEADS = [
     status: 'won' as const,
   },
   {
-    id: 'lead-002-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: '652ca69b-496b-5b27-b36b-93ea0cccf0bd',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     source: 'da' as const,
     daReference: 'DA-2026-00124',
     customerName: 'Sarah Johnson',
@@ -92,8 +92,8 @@ const DEMO_LEADS = [
     status: 'sent' as const,
   },
   {
-    id: 'lead-003-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: 'b0ce8128-b40d-54b4-bcd3-fe1e03db52a9',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     source: 'manual' as const,
     daReference: null,
     customerName: 'Michael Brown',
@@ -104,8 +104,8 @@ const DEMO_LEADS = [
     status: 'draft_ready' as const,
   },
   {
-    id: 'lead-004-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: '08c1505e-db9a-5958-92a6-008c086eb952',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     source: 'da' as const,
     daReference: 'DA-2026-00125',
     customerName: 'Emma Wilson',
@@ -116,8 +116,8 @@ const DEMO_LEADS = [
     status: 'generating' as const,
   },
   {
-    id: 'lead-005-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: '75b1f3cf-5b1e-56fc-a6b7-724e760dcc6e',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     source: 'manual' as const,
     daReference: null,
     customerName: 'David Lee',
@@ -130,8 +130,8 @@ const DEMO_LEADS = [
 
   // Crew 002 (Painter) leads
   {
-    id: 'lead-006-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: 'afc1d35e-7420-5aaf-bc2d-582d0d365241',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     source: 'da' as const,
     daReference: 'DA-2026-00200',
     customerName: 'Rachel Green',
@@ -142,8 +142,8 @@ const DEMO_LEADS = [
     status: 'won' as const,
   },
   {
-    id: 'lead-007-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: 'ee8f5bf7-105e-5bc8-a279-3285db79e826',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     source: 'manual' as const,
     daReference: null,
     customerName: 'Lisa Anderson',
@@ -154,8 +154,8 @@ const DEMO_LEADS = [
     status: 'sent' as const,
   },
   {
-    id: 'lead-008-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: 'afceac10-5200-5d96-9cc6-62be746e580a',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     source: 'da' as const,
     daReference: 'DA-2026-00201',
     customerName: 'Chris Martinez',
@@ -166,8 +166,8 @@ const DEMO_LEADS = [
     status: 'draft_ready' as const,
   },
   {
-    id: 'lead-009-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: 'fc1564e0-9c44-5fda-8936-37a25c9f3cbd',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     source: 'manual' as const,
     daReference: null,
     customerName: 'Karen White',
@@ -178,8 +178,8 @@ const DEMO_LEADS = [
     status: 'new' as const,
   },
   {
-    id: 'lead-010-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: '3fdbd1b9-485d-519f-be64-2f1e0ca323ff',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     source: 'da' as const,
     daReference: 'DA-2026-00202',
     customerName: 'Tom Harris',
@@ -192,8 +192,8 @@ const DEMO_LEADS = [
 
   // Crew 003 (Plumber) leads
   {
-    id: 'lead-011-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: '63e8ede8-115f-5489-84f5-2837978a2878',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     source: 'da' as const,
     daReference: 'DA-2026-00300',
     customerName: 'Angela Clark',
@@ -204,8 +204,8 @@ const DEMO_LEADS = [
     status: 'won' as const,
   },
   {
-    id: 'lead-012-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: 'dce20d9c-3502-59b0-9fb9-9d6f816223a0',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     source: 'manual' as const,
     daReference: null,
     customerName: 'Mark Taylor',
@@ -216,8 +216,8 @@ const DEMO_LEADS = [
     status: 'sent' as const,
   },
   {
-    id: 'lead-013-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: '0c0b4021-02a3-57af-9139-9bb9d65a30d2',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     source: 'da' as const,
     daReference: 'DA-2026-00301',
     customerName: 'Sophia Taylor',
@@ -228,8 +228,8 @@ const DEMO_LEADS = [
     status: 'draft_ready' as const,
   },
   {
-    id: 'lead-014-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: 'bebd1578-75f3-59b0-b8d2-17ebbd4a5c00',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     source: 'manual' as const,
     daReference: null,
     customerName: 'James Patterson',
@@ -240,8 +240,8 @@ const DEMO_LEADS = [
     status: 'new' as const,
   },
   {
-    id: 'lead-015-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: 'b6109981-7419-54d6-8b89-d22d650d3cf5',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     source: 'da' as const,
     daReference: 'DA-2026-00302',
     customerName: 'Nina Sharma',
@@ -256,9 +256,9 @@ const DEMO_LEADS = [
 // Demo quotes (1 per crew, all in draft/approved for dogfood visibility)
 const DEMO_QUOTES = [
   {
-    id: 'quote-001-uuid',
-    leadId: 'lead-001-uuid',
-    crewId: 'crew-001-roofer-uuid',
+    id: '8457516b-705f-56e4-9602-a616e9feaed9',
+    leadId: 'd4400ef5-8369-50e3-9bad-4a9c95560e6b',
+    crewId: 'fa36070e-edef-5df8-920a-e8a0437a7d51',
     status: 'approved' as const,
     subtotalAud: 4200,
     gstAud: 420,
@@ -270,9 +270,9 @@ const DEMO_QUOTES = [
     rateCardSource: 'live' as const,
   },
   {
-    id: 'quote-002-uuid',
-    leadId: 'lead-006-uuid',
-    crewId: 'crew-002-painter-uuid',
+    id: '272b0d9f-f6c8-50f5-a2e3-683daf777e7a',
+    leadId: 'afc1d35e-7420-5aaf-bc2d-582d0d365241',
+    crewId: 'e176712c-e8fa-5bac-af9d-1763db75e8e3',
     status: 'approved' as const,
     subtotalAud: 1800,
     gstAud: 180,
@@ -284,9 +284,9 @@ const DEMO_QUOTES = [
     rateCardSource: 'live' as const,
   },
   {
-    id: 'quote-003-uuid',
-    leadId: 'lead-011-uuid',
-    crewId: 'crew-003-plumber-uuid',
+    id: 'f84c7b47-8eaf-5873-a666-483ac36c0c74',
+    leadId: '63e8ede8-115f-5489-84f5-2837978a2878',
+    crewId: 'b013d74c-b8ba-5099-a5f6-3fc7f5b8718e',
     status: 'approved' as const,
     subtotalAud: 3500,
     gstAud: 350,
@@ -303,8 +303,8 @@ const DEMO_QUOTES = [
 const DEMO_LINE_ITEMS = [
   // Quote 001 (Roofing)
   {
-    id: 'lineitem-001-uuid',
-    quoteId: 'quote-001-uuid',
+    id: '4bfa0c89-df2e-5239-8a99-d7603b1dcd24',
+    quoteId: '8457516b-705f-56e4-9602-a616e9feaed9',
     description: 'Colorbond roof sheets - Monument',
     qty: 180,
     unit: 'm2',
@@ -314,8 +314,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 1,
   },
   {
-    id: 'lineitem-002-uuid',
-    quoteId: 'quote-001-uuid',
+    id: '7e1e1d80-176e-5be7-8a58-1b071214965a',
+    quoteId: '8457516b-705f-56e4-9602-a616e9feaed9',
     description: 'Roof installation labour',
     qty: 45,
     unit: 'hr',
@@ -325,8 +325,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 2,
   },
   {
-    id: 'lineitem-003-uuid',
-    quoteId: 'quote-001-uuid',
+    id: 'a08ea154-3a80-5db2-9567-92c66f98ef74',
+    quoteId: '8457516b-705f-56e4-9602-a616e9feaed9',
     description: 'Flashing and ridge capping',
     qty: 150,
     unit: 'm',
@@ -336,8 +336,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 3,
   },
   {
-    id: 'lineitem-004-uuid',
-    quoteId: 'quote-001-uuid',
+    id: '8426c119-bc08-516a-a4b3-2907791fb9b5',
+    quoteId: '8457516b-705f-56e4-9602-a616e9feaed9',
     description: 'Old roof removal and disposal',
     qty: 180,
     unit: 'm2',
@@ -347,8 +347,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 4,
   },
   {
-    id: 'lineitem-005-uuid',
-    quoteId: 'quote-001-uuid',
+    id: 'acc7e281-930a-59a9-8a65-3826bbc4a050',
+    quoteId: '8457516b-705f-56e4-9602-a616e9feaed9',
     description: 'Roof gutters and downpipes',
     qty: 60,
     unit: 'm',
@@ -360,8 +360,8 @@ const DEMO_LINE_ITEMS = [
 
   // Quote 002 (Painting)
   {
-    id: 'lineitem-006-uuid',
-    quoteId: 'quote-002-uuid',
+    id: 'd0cfd790-4899-5905-8466-827eb00f86ee',
+    quoteId: '272b0d9f-f6c8-50f5-a2e3-683daf777e7a',
     description: 'Dulux Acrylic paint - White',
     qty: 20,
     unit: 'L',
@@ -371,8 +371,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 1,
   },
   {
-    id: 'lineitem-007-uuid',
-    quoteId: 'quote-002-uuid',
+    id: '057196b5-70ea-5ee1-be1f-be645fd217fb',
+    quoteId: '272b0d9f-f6c8-50f5-a2e3-683daf777e7a',
     description: 'Interior painting labour',
     qty: 20,
     unit: 'hr',
@@ -382,8 +382,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 2,
   },
   {
-    id: 'lineitem-008-uuid',
-    quoteId: 'quote-002-uuid',
+    id: 'ed84316e-ae86-588c-8fad-f1c5f2c6ce6f',
+    quoteId: '272b0d9f-f6c8-50f5-a2e3-683daf777e7a',
     description: 'Surface preparation (sanding, patching)',
     qty: 8,
     unit: 'hr',
@@ -395,8 +395,8 @@ const DEMO_LINE_ITEMS = [
 
   // Quote 003 (Plumbing)
   {
-    id: 'lineitem-009-uuid',
-    quoteId: 'quote-003-uuid',
+    id: 'bd9da1dd-a047-5008-8425-18019c0f822f',
+    quoteId: 'f84c7b47-8eaf-5873-a666-483ac36c0c74',
     description: 'Bathroom suite (WC, basin, bath)',
     qty: 1,
     unit: 'set',
@@ -406,8 +406,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 1,
   },
   {
-    id: 'lineitem-010-uuid',
-    quoteId: 'quote-003-uuid',
+    id: '0bcbf0ca-8775-5f67-88a9-634dbbc8a1c1',
+    quoteId: 'f84c7b47-8eaf-5873-a666-483ac36c0c74',
     description: 'Shower screen (frameless, 1200mm)',
     qty: 1,
     unit: 'ea',
@@ -417,8 +417,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 2,
   },
   {
-    id: 'lineitem-011-uuid',
-    quoteId: 'quote-003-uuid',
+    id: 'b96cf5c1-86d6-530e-a6c7-700fce9e5cd1',
+    quoteId: 'f84c7b47-8eaf-5873-a666-483ac36c0c74',
     description: 'Bathroom renovation labour',
     qty: 35,
     unit: 'hr',
@@ -428,8 +428,8 @@ const DEMO_LINE_ITEMS = [
     sortOrder: 3,
   },
   {
-    id: 'lineitem-012-uuid',
-    quoteId: 'quote-003-uuid',
+    id: 'a2ab8a6e-397e-5247-9cb3-9f4be56a1f15',
+    quoteId: 'f84c7b47-8eaf-5873-a666-483ac36c0c74',
     description: 'Waterproofing and tiling labour',
     qty: 10,
     unit: 'hr',

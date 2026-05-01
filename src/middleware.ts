@@ -27,6 +27,10 @@ const PUBLIC_ROUTES = [
   "/",             // Marketing landing page (unauthenticated visitors)
   "/login",
   "/onboarding",
+  "/privacy",
+  "/terms",
+  "/cookies",
+  "/acceptable-use",
   "/q/",           // Customer quote view (signed URL)
   "/api/auth/otp",
   "/api/auth/onboarding",
