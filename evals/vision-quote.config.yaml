@@ -1,0 +1,186 @@
+# promptfoo eval — vision quote (claude-opus-4-7)
+# CI gate: pnpm eval
+# Stack: ai.models.vision_quoting=claude-opus-4-7
+#
+# NFR-006: ≥80% line-item accuracy on a 50-photo gold set.
+# V1 ships with 10 fixtures (see evals/fixtures/gold-set.jsonl); we expand
+# to 50 before beta — tracked in OI-004 (docs/02-system-requirements.md
+# Appendix B). The 10 fixtures cover the core wedge cases:
+#   - 5 roofer photos (re-roof, gutter replacement, valley repair, ridge cap, partial roof)
+#   - 3 painter photos (interior walls, exterior weatherboard, fence)
+#   - 1 plumber photo (kitchen sink replacement)
+#   - 1 landscaper photo (turf laying)
+
+description: "Vision pass — photo + context → itemised quote draft"
+
+prompts:
+  - file://evals/vision-quote.prompt.js
+
+providers:
+  - id: anthropic:messages:claude-opus-4-7
+    config:
+      max_tokens: 4096
+      thinking:
+        type: adaptive
+        display: omitted
+      # No temperature/top_p/top_k — Opus 4.7 returns 400 (claude-api skill).
+
+defaultTest:
+  options:
+    cache: true
+
+# Each test in tests[] is one gold-set fixture. The full set lives in
+# evals/fixtures/gold-set.jsonl and is loaded via tests below; for V1 we
+# inline the 10 to keep diffs reviewable.
+tests:
+  # ---- ROOFER fixtures (5) ----
+  - vars:
+      trade: roofer
+      context_note: "Re-roof, colorbond, single-storey, gutters too"
+      photo_urls: |
+        ["https://example.com/gold/roof-01.jpg"]
+      labour_rate: 95.00
+      rate_card_block: |
+        - [bunnings BC-CB-040] Colorbond sheet 0.42mm x 2400mm — A$22.50
+        - [bunnings BC-RC-001] Ridge cap 2.4m — A$24.95
+        - [bunnings BC-GU-001] Quad gutter colorbond — A$18.00
+        - [bunnings BC-VI-001] Valley iron 3m — A$45.00
+        - [bunnings BC-FAS-001] Sealant tube — A$12.95
+    assert:
+      - type: contains
+        value: "## Materials"
+      - type: contains
+        value: "## Labour"
+      - type: javascript
+        value: |
+          // Wedge accuracy: must include colorbond, ridge cap, gutter, labour
+          const must = ["Colorbond", "Ridge cap", "gutter", "labour"];
+          return must.every(m => output.toLowerCase().includes(m.toLowerCase()));
+
+  - vars:
+      trade: roofer
+      context_note: "Gutter replacement only, two-storey home"
+      photo_urls: |
+        ["https://example.com/gold/roof-02.jpg"]
+      labour_rate: 95.00
+      rate_card_block: |
+        - [bunnings BC-GU-001] Quad gutter colorbond — A$18.00
+        - [bunnings BC-DP-001] Downpipe 90mm 3m — A$32.00
+    assert:
+      - type: javascript
+        value: |
+          // Two-storey must trigger a Notes mention of access/scaffold
+          return /two[- ]?storey|scaffold|access/i.test(output);
+
+  - vars:
+      trade: roofer
+      context_note: ""
+      photo_urls: |
+        ["https://example.com/gold/roof-03.jpg"]
+      labour_rate: 95.00
+      rate_card_block: ""
+    assert:
+      - type: javascript
+        value: |
+          // No rate card: every material line must carry NO RATE-CARD MATCH
+          const matLines = output.split('\n').filter(l => l.includes('A$'));
+          return matLines.every(l => l.includes('NO RATE-CARD MATCH'));
+
+  - vars:
+      trade: roofer
+      context_note: "Valley iron replacement, leaks reported"
+      photo_urls: |
+        ["https://example.com/gold/roof-04.jpg"]
+      labour_rate: 95.00
+      rate_card_block: |
+        - [bunnings BC-VI-001] Valley iron 3m — A$45.00
+        - [bunnings BC-FL-001] Flashing 600x3000 — A$28.00
+    assert:
+      - type: contains
+        value: "Valley"
+
+  - vars:
+      trade: roofer
+      context_note: "Ridge cap replacement only"
+      photo_urls: |
+        ["https://example.com/gold/roof-05.jpg"]
+      labour_rate: 95.00
+      rate_card_block: |
+        - [bunnings BC-RC-001] Ridge cap 2.4m — A$24.95
+    assert:
+      - type: contains
+        value: "Ridge cap"
+
+  # ---- PAINTER fixtures (3) ----
+  - vars:
+      trade: painter
+      context_note: "Interior repaint, lounge + kitchen, two coats"
+      photo_urls: |
+        ["https://example.com/gold/paint-01.jpg"]
+      labour_rate: 75.00
+      rate_card_block: |
+        - [bunnings PA-INT-10L] Dulux Wash&Wear interior 10L — A$185.00
+        - [bunnings PA-PR-10L] Primer 10L — A$95.00
+    assert:
+      - type: javascript
+        value: |
+          return /two coats|prime|prep/i.test(output);
+
+  - vars:
+      trade: painter
+      context_note: "Exterior weatherboard, full house"
+      photo_urls: |
+        ["https://example.com/gold/paint-02.jpg"]
+      labour_rate: 75.00
+      rate_card_block: |
+        - [bunnings PA-EXT-10L] Dulux Weathershield 10L — A$220.00
+    assert:
+      - type: contains
+        value: "Weathershield"
+
+  - vars:
+      trade: painter
+      context_note: "Timber fence stain, 25 linear metres"
+      photo_urls: |
+        ["https://example.com/gold/paint-03.jpg"]
+      labour_rate: 75.00
+      rate_card_block: |
+        - [bunnings PA-STN-4L] Cabot's timber stain 4L — A$78.00
+    assert:
+      - type: contains
+        value: "stain"
+
+  # ---- PLUMBER fixture (1) ----
+  - vars:
+      trade: plumber
+      context_note: "Kitchen sink swap, existing copper supply lines"
+      photo_urls: |
+        ["https://example.com/gold/plumb-01.jpg"]
+      labour_rate: 110.00
+      rate_card_block: |
+        - [reece PL-SINK-450] Stainless single-bowl sink 450mm — A$240.00
+        - [reece PL-MIX-001] Kitchen mixer chrome — A$165.00
+    assert:
+      - type: contains
+        value: "sink"
+
+  # ---- LANDSCAPER fixture (1) ----
+  - vars:
+      trade: landscaper
+      context_note: "Lay turf 35m², backyard, kikuyu"
+      photo_urls: |
+        ["https://example.com/gold/garden-01.jpg"]
+      labour_rate: 85.00
+      rate_card_block: |
+        - [bunnings LA-TF-KIK] Kikuyu turf roll m² — A$13.50
+        - [bunnings LA-SOI-50L] Lawn soil 50L bag — A$8.95
+    assert:
+      - type: contains
+        value: "turf"
+      - type: javascript
+        value: |
+          // Wastage allowance — should be 35-40 m²
+          const m = output.match(/(\d+)\s*m²/);
+          if (!m) return false;
+          const qty = Number(m[1]);
+          return qty >= 35 && qty <= 42;

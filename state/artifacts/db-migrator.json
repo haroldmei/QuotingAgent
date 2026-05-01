@@ -1,0 +1,150 @@
+{
+  "skill": "db-migrator",
+  "produced_at": "2026-05-01T16:53:00Z",
+  "files": [
+    {
+      "path": "prisma/schema.prisma",
+      "required": true,
+      "kind": "file"
+    },
+    {
+      "path": "prisma/seed.ts",
+      "required": true,
+      "kind": "file"
+    },
+    {
+      "path": "supabase/migrations",
+      "required": true,
+      "kind": "dir",
+      "min_entries": 5
+    },
+    {
+      "path": "package.json",
+      "required": true,
+      "kind": "file"
+    }
+  ],
+  "package_scripts": [
+    "db:generate",
+    "db:migrate:dev",
+    "db:migrate:deploy",
+    "db:seed",
+    "db:studio"
+  ],
+  "prisma_seed_command": "tsx prisma/seed.ts",
+  "boot_command": "pnpm db:generate && pnpm db:migrate:deploy && pnpm db:seed",
+  "seed_command": "pnpm db:seed",
+  "migrations": [
+    {
+      "timestamp": "20260501000001",
+      "name": "auth_schema",
+      "tables_created": [
+        "crews",
+        "users",
+        "leads",
+        "photos",
+        "quotes",
+        "quote_line_items",
+        "quote_acceptances",
+        "quote_ai_usage",
+        "sms_events",
+        "job_completions",
+        "fsm_connections",
+        "followup_schedules",
+        "push_subscriptions",
+        "rate_card_items"
+      ]
+    },
+    {
+      "timestamp": "20260501000002",
+      "name": "pgvector_embeddings",
+      "tables_created": [
+        "rate_card_embeddings"
+      ]
+    },
+    {
+      "timestamp": "20260501000003",
+      "name": "rls_policies",
+      "description": "Row-Level Security policies for crew-as-tenant multi-tenancy"
+    },
+    {
+      "timestamp": "20260501000004",
+      "name": "ai_calls_ledger",
+      "tables_created": [
+        "ai_calls"
+      ]
+    },
+    {
+      "timestamp": "20260501000005",
+      "name": "rate_card_search_rpc",
+      "description": "RPC function for pgvector similarity search"
+    }
+  ],
+  "migrations_count": 5,
+  "seed_expectations": {
+    "idempotent": true,
+    "tables": [
+      {
+        "name": "crews",
+        "min_rows": 3,
+        "count_query": "SELECT COUNT(*) FROM public.crews"
+      },
+      {
+        "name": "users",
+        "min_rows": 3,
+        "count_query": "SELECT COUNT(*) FROM public.users"
+      },
+      {
+        "name": "leads",
+        "min_rows": 15,
+        "count_query": "SELECT COUNT(*) FROM public.leads"
+      },
+      {
+        "name": "quotes",
+        "min_rows": 3,
+        "count_query": "SELECT COUNT(*) FROM public.quotes"
+      },
+      {
+        "name": "quote_line_items",
+        "min_rows": 12,
+        "count_query": "SELECT COUNT(*) FROM public.quote_line_items"
+      },
+      {
+        "name": "rate_card_items",
+        "min_rows": 50,
+        "count_query": "SELECT COUNT(*) FROM public.rate_card_items"
+      }
+    ],
+    "wedge_critical_tables": [
+      "crews",
+      "leads",
+      "quotes",
+      "rate_card_items"
+    ]
+  },
+  "seed_summary": {
+    "demo_crews": 3,
+    "demo_users": 3,
+    "demo_leads": 15,
+    "demo_quotes": 3,
+    "demo_line_items": 12,
+    "bunnings_reece_skus": 50,
+    "total_seeded_rows": 86
+  },
+  "notes": [
+    "3 demo crews: Sydney Roofing Co (roofer), Penrith Painters (painter), Blacktown Plumbing (plumber)",
+    "All crews are licensed (L001234567+) and have verified NSW licence numbers",
+    "15 demo leads distributed across 3 crews (5 per crew), mix of DA and manual sources",
+    "Leads span all status stages: new, generating, draft_ready, sent, delivered, opened, won, lost",
+    "3 fully-priced demo quotes (one per crew) with confidence scores and statutory warranty text",
+    "50+ Bunnings/Reece rate-card items covering roofing, plumbing, painting, general materials",
+    "Seed is idempotent: safe to run multiple times without duplicates",
+    "Design reference: docs/03-system-design.md §3; stack contract: docs/00-tech-stack.md"
+  ],
+  "prisma_version": "5.22.0",
+  "postgres_version": "16",
+  "provider": "supabase",
+  "pgvector_enabled": true,
+  "rls_enabled": true,
+  "required_paths_count": 4
+}

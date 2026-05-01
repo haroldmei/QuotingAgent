@@ -1,2 +1,30 @@
 .claude/scheduled_tasks.lock
 *:Zone.Identifier
+.gstack/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Test output
+playwright-report/
+test-results/
+coverage/
+
+# Local dogfood artifacts (screenshots, traces) — root only, not docs/dogfood/
+/dogfood/
+
+# Editor / OS
+.DS_Store
+*.log

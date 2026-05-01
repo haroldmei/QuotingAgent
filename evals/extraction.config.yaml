@@ -1,0 +1,72 @@
+# promptfoo eval — extraction pass (claude-haiku-4-5)
+# CI gate: pnpm eval — see scripts/quality-gates.sh
+# Stack: ai.models.line_item_extraction=claude-haiku-4-5
+
+description: "Extraction pass — vision draft → strict JSON quote"
+
+prompts:
+  - file://evals/extraction.prompt.js
+
+providers:
+  - id: anthropic:messages:claude-haiku-4-5
+    config:
+      max_tokens: 2048
+      temperature: 0  # haiku-4-5 still accepts temperature; deterministic for evals
+
+defaultTest:
+  options:
+    # Cost ceiling per call — haiku-4-5 should hit well under A$0.005
+    cache: true
+
+# 10 fixtures — see evals/fixtures/extraction.jsonl
+tests:
+  - vars:
+      vision_draft: |
+        ## Materials
+        - [bunnings BC-CB-040] Colorbond sheet 0.42mm x 2400mm: 78 m² @ A$22.50
+        - [bunnings BC-RC-001] Ridge cap 2.4m: 12 ea @ A$24.95
+        - [bunnings BC-VI-001] Valley iron 3m: 4 ea @ A$45.00
+        ## Labour
+        - Strip and re-roof: 16h @ A$95/hr
+        ## Notes
+        - Single-storey, clear access, no skylights visible.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const j = JSON.parse(output);
+          return j.lines.length === 4
+            && j.lines.every(l => l.confidence_score >= 80)
+            && j.requires_review === false
+            && j.lines.find(l => l.kind === 'labour') !== undefined;
+      - type: cost
+        threshold: 0.005
+
+  - vars:
+      vision_draft: |
+        ## Materials
+        - Mystery component: 1 ea @ A$? (NO RATE-CARD MATCH)
+        ## Labour
+        - Site assessment: 2h @ A$95/hr
+        ## Notes
+        - Photos are very dark; only one angle of the roof visible.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const j = JSON.parse(output);
+          // Mystery line must be flagged or quote routed to review.
+          const mystery = j.lines.find(l => l.description.toLowerCase().includes('mystery'));
+          return j.requires_review === true
+            && (!mystery || mystery.confidence_score < 60);
+
+  - vars:
+      vision_draft: |
+        Photos are too unclear to estimate. Only blurry indoor shots
+        provided when expecting roof imagery.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const j = JSON.parse(output);
+          return j.requires_review === true && j.lines.length === 0;

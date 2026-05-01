@@ -1,0 +1,1715 @@
+openapi: 3.1.0
+info:
+  title: QuotingAgent API
+  version: 1.0.0
+  description: |
+    AI-powered quoting system for Western Sydney trade businesses.
+    For 1–10 staff residential trade owners, a site photo becomes an SMS-sent,
+    AU-priced, NSW-licence-bound quote in under 5 minutes.
+  contact:
+    url: https://quotingagent.com.au
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: https://app.quotingagent.com.au/api
+    description: Production (Vercel Sydney region)
+
+tags:
+  - name: Authentication
+    description: Phone-OTP sign-up, verification, and onboarding
+  - name: Leads
+    description: Lead management (create, list, update, detail)
+  - name: Photos
+    description: Photo upload for leads
+  - name: Quotes
+    description: Quote generation, review, send, and acceptance
+  - name: Compliance
+    description: NSW licence validation and compliance checks
+  - name: Webhooks
+    description: Inbound webhooks from DA aggregator and Twilio
+  - name: FSM
+    description: Field Service Management (ServiceM8, Tradify) integration
+  - name: Notifications
+    description: Web push notifications
+
+paths:
+  /auth/otp:
+    post:
+      tags:
+        - Authentication
+      summary: Start or verify phone OTP
+      description: |
+        Two-in-one endpoint: sends OTP if no `token` field; verifies OTP if `token` is present.
+
+        Rate limits:
+        - OTP start: 5/hr per phone
+        - OTP verify: 10/hr per phone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/OtpStartReq'
+                - $ref: '#/components/schemas/OtpVerifyReq'
+            examples:
+              start:
+                summary: Start OTP
+                value:
+                  phone: "+61412345678"
+              verify:
+                summary: Verify OTP
+                value:
+                  phone: "+61412345678"
+                  token: "123456"
+      responses:
+        '200':
+          description: OTP verified successfully (returning user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpVerifyRes'
+        '201':
+          description: OTP sent successfully (new request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpStartRes'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/onboarding:
+    post:
+      tags:
+        - Authentication
+      summary: Complete crew profile setup after OTP
+      description: |
+        One-screen onboarding: validates NSW contractor licence and creates crew + user records.
+        Requires valid Supabase JWT from OTP verification.
+
+        **FR-002**: 4 required fields (business_name, trade_type, nsw_licence_number, default_labour_rate_aud).
+        Licence must validate via Service NSW API before profile is saved.
+
+        Rate limit: 20/hr per user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingReq'
+            example:
+              business_name: "Sydney Roofing Co"
+              trade_type: "roofer"
+              nsw_licence_number: "ABN12345678901"
+              default_labour_rate_aud: 75.5
+              abn: "12345678901"
+      responses:
+        '201':
+          description: Crew profile created and licence verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingRes'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Onboarding already completed
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          description: NSW licence verification service unavailable
+
+  /leads:
+    get:
+      tags:
+        - Leads
+      summary: List leads for authenticated crew
+      description: |
+        Keyset pagination using cursor (created_at).
+        **FR-004**: Tray ordered by recency (newest first).
+
+        Rate limit: 600/hr per crew
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: ISO timestamp for keyset pagination
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - "new"
+              - "generating"
+              - "draft_ready"
+              - "sent"
+              - "delivered"
+              - "opened"
+              - "won"
+              - "lost"
+          description: Filter by lead status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+      responses:
+        '200':
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Lead'
+                  next_cursor:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  total:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+    post:
+      tags:
+        - Leads
+      summary: Create manual lead
+      description: |
+        **FR-007**: Manual lead entry from phone call or inbound SMS.
+        Only customer_name is required; address and description are optional.
+
+        Rate limit: 200/hr per crew
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualLeadReq'
+            example:
+              customer_name: "John Smith"
+              customer_mobile: "+61412345678"
+              address: "42 Maple St, Sydney NSW 2000"
+              description: "Roof repair needed"
+      responses:
+        '201':
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /leads/{id}:
+    get:
+      tags:
+        - Leads
+      summary: Get lead detail with photos
+      description: |
+        **FR-005**: Lead detail screen with attached photos.
+        Returns all photos associated with the lead.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Lead detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Lead'
+                  - type: object
+                    properties:
+                      photos:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Photo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Leads
+      summary: Update lead status, description, or contact info
+      description: |
+        **FR-005**: Update lead fields (status, description, sms_disabled_followup, etc.).
+        All fields are optional.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadPatchReq'
+            example:
+              status: "draft_ready"
+              sms_disabled_followup: false
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /leads/{id}/photos:
+    post:
+      tags:
+        - Photos
+      summary: Photo upload (two-phase)
+      description: |
+        **FR-008, FR-009**: Two-phase upload flow.
+
+        Phase 1 (?action=init): Request signed GCS PUT URLs.
+        Phase 2 (?action=commit): Commit uploaded photos to DB after client PUT to GCS.
+
+        Max 15 photos per lead. EXIF metadata preserved.
+
+        Rate limit: 200/hr per crew
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: ["init", "commit"]
+            default: "init"
+          description: Upload phase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PhotoUploadInitReq'
+                - $ref: '#/components/schemas/PhotoCommitReq'
+            examples:
+              init:
+                summary: Request upload URLs
+                value:
+                  count: 2
+                  mime_types: ["image/jpeg", "image/jpeg"]
+              commit:
+                summary: Commit uploaded photos
+                value:
+                  photos:
+                    - gcs_path: "photos/lead-abc123/0.jpg"
+                      exif_data:
+                        lat: -33.8688
+                        lng: 151.2093
+                        timestamp: "2026-05-01T10:30:00Z"
+                        device: "iPhone 14"
+      responses:
+        '200':
+          description: Phase 1 - Signed URLs generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoUploadInitRes'
+        '201':
+          description: Phase 2 - Photos committed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Photo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Max 15 photos per lead exceeded
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /leads/{id}/quote:
+    post:
+      tags:
+        - Quotes
+      summary: Enqueue AI quote generation
+      description: |
+        **FR-011**: Async quote generation via BullMQ.
+        Enqueues a background job; lead status immediately updates to "generating".
+        Push notification fires when draft is ready (≤60s p50 target).
+
+        Requires ≥1 photo attached. NSW licence must be verified.
+
+        Rate limit: 100/day per crew
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteEnqueueReq'
+            example:
+              context: "Re-roof, colorbond, single-storey, gutters too"
+      responses:
+        '202':
+          description: Quote generation enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteEnqueueRes'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: NSW contractor licence not verified
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: At least one photo is required
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: Quote generation service temporarily unavailable
+
+    get:
+      tags:
+        - Quotes
+      summary: Get latest quote draft for lead
+      description: |
+        **FR-015**: Fetch the most recent quote + line items for review.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Latest quote with line items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Quote'
+                  - type: object
+                    properties:
+                      quote_line_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuoteLineItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No quote found for this lead
+
+  /quotes/{id}/line-items/{lineId}:
+    patch:
+      tags:
+        - Quotes
+      summary: Edit a quote line item (tap-to-edit)
+      description: |
+        **FR-015**: Edit description, qty, unit, or unit_price_aud.
+        Automatically recalculates subtotal, GST (10%), and total.
+        Cannot edit quotes in sent/accepted/declined status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+        - name: lineId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineItemPatchReq'
+            example:
+              qty: 10
+              unit_price_aud: 45.99
+      responses:
+        '200':
+          description: Updated quote with all line items and recalculated totals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Quote'
+                  - type: object
+                    properties:
+                      quote_line_items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuoteLineItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot edit quote in sent/accepted/declined status
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /quotes/{id}/send:
+    post:
+      tags:
+        - Quotes
+      summary: Approve and send quote via SMS or email
+      description: |
+        **FR-016, FR-017, FR-019**: Generate PDF + send SMS via Twilio AU long-code.
+        If SMS fails or no mobile, email fallback via Resend.
+
+        Snapshots NSW licence number and statutory warranty text into quote.
+        Updates lead status → "sent".
+        Schedules D+3 / D+7 followup SMS (unless disabled).
+
+        Rate limit: 100/day per crew
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendReq'
+            example:
+              sms_body: "Hi John, here's your roofing quote. Expires in 7 days."
+      responses:
+        '200':
+          description: Quote sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["sent", "sent_by_email"]
+                  sms_event_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  pdf_signed_url:
+                    type: string
+                    format: uri
+                  quote_view_url:
+                    type: string
+                    format: uri
+                  sent_by_email:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: NSW contractor licence must be verified before sending quotes
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Quote is already in sent/accepted/declined status
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Failed to generate PDF
+
+  /quotes/{id}/view:
+    get:
+      tags:
+        - Quotes
+      summary: Public quote view page (unauthenticated)
+      description: |
+        **FR-020**: Return full quote data for mobile rendering.
+        No authentication required — verified via signed HMAC token (?t=).
+
+        Fires read-receipt: updates lead status → "opened" and sends push to tradie.
+
+        Rate limit: 60/min per IP
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+        - name: t
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Signed HMAC token (mint by /send endpoint)
+      responses:
+        '200':
+          description: Quote data for customer view
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                      subtotal_aud:
+                        type: number
+                      gst_aud:
+                        type: number
+                      total_aud:
+                        type: number
+                      licence_number:
+                        type: string
+                      statutory_warranty_text:
+                        type: string
+                      pdf_url:
+                        type: string
+                        format: uri
+                      sent_at:
+                        type: string
+                        format: date-time
+                  lead:
+                    type: object
+                    properties:
+                      customer_name:
+                        type: string
+                      address:
+                        type: string
+                        nullable: true
+                  crew:
+                    type: object
+                    properties:
+                      business_name:
+                        type: string
+                      abn:
+                        type: string
+                        nullable: true
+                      nsw_licence_number:
+                        type: string
+                  line_items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuoteLineItem'
+        '403':
+          description: Invalid or expired quote link
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /quotes/{id}/accept:
+    post:
+      tags:
+        - Quotes
+      summary: Customer accepts quote
+      description: |
+        **FR-021**: One-tap acceptance. No authentication required — verified via signed token.
+
+        Records legally timestamped acceptance (7-year retention for NSW Home Building Act).
+        Updates lead status → "won". Enqueues FSM job push (if connected).
+        Sends push notification to tradie.
+        Cancels pending followup SMS.
+
+        Idempotent on quote_id (UNIQUE constraint).
+
+        Rate limit: 10/min per IP
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptReq'
+            example:
+              signed_token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+              customer_name: "John Smith"
+      responses:
+        '200':
+          description: Quote accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted_at:
+                    type: string
+                    format: date-time
+                  already_accepted:
+                    type: boolean
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Invalid or expired quote link
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Quote has already been declined
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /quotes/{id}/decline:
+    post:
+      tags:
+        - Quotes
+      summary: Customer declines quote
+      description: |
+        **FR-022**: Decline with optional reason.
+        No authentication required — verified via signed token.
+
+        Updates lead status → "lost".
+        Sends push notification to tradie with decline reason.
+
+        Rate limit: 10/min per IP
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeclineReq'
+            example:
+              signed_token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+              reason: "Price too high"
+      responses:
+        '200':
+          description: Quote declined
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  declined_at:
+                    type: string
+                    format: date-time
+                  already_declined:
+                    type: boolean
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Invalid or expired quote link
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Quote has already been accepted
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /crew/licence-validate:
+    post:
+      tags:
+        - Compliance
+      summary: Validate NSW contractor licence
+      description: |
+        **FR-002**: Validate licence number via Service NSW REST API.
+        Caches result for 24h.
+        If valid, updates crew.licence_verified = true.
+
+        Rate limit: 30/hr per crew
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenceValidateReq'
+            example:
+              nsw_licence_number: "ABN12345678901"
+      responses:
+        '200':
+          description: Licence validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenceValidateRes'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Onboarding not complete
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: NSW licence verification service unavailable
+
+  /webhooks/da-lead:
+    post:
+      tags:
+        - Webhooks
+      summary: DA aggregator webhook (Development Application lead ingest)
+      description: |
+        **FR-006**: Receive DA notifications from external aggregator.
+        Authenticates via HMAC-SHA256 signature (X-DA-Signature header).
+        Deduplicates by (crew_id, da_reference) — silently discards duplicates.
+        Creates lead card in tray. Sends push notification to crew owner.
+
+        No bearer auth required — webhook signature only.
+
+        Rate limit: 1000/min per IP (DDoS guard)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DaWebhookReq'
+            example:
+              da_reference: "DA-2026-00123456"
+              address: "42 Maple Street, Sydney NSW 2000"
+              description: "Residential roof replacement"
+              council: "Sydney City Council"
+              received_at: "2026-05-01T10:00:00Z"
+              customer_name: "John Smith"
+              customer_mobile: "+61412345678"
+      responses:
+        '200':
+          description: DA lead processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: boolean
+                  lead_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  duplicate:
+                    type: boolean
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid HMAC signature
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Failed to create lead
+
+  /webhooks/twilio/delivery:
+    post:
+      tags:
+        - Webhooks
+      summary: Twilio SMS delivery status callback
+      description: |
+        **FR-018**: Called by Twilio when SMS status changes (sent → delivered → failed/read).
+        Authenticates via X-Twilio-Signature header.
+        Updates sms_events and lead status.
+        On delivery failure: triggers email fallback (FR-019).
+
+        No bearer auth required — Twilio signature only.
+
+        Rate limit: 1000/min per IP
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                MessageSid:
+                  type: string
+                MessageStatus:
+                  type: string
+                  enum: ["sent", "delivered", "failed", "undelivered", "read"]
+                ErrorCode:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Webhook accepted
+          content:
+            text/xml:
+              example: "<Response></Response>"
+
+  /webhooks/twilio/read:
+    get:
+      tags:
+        - Webhooks
+      summary: SMS read-receipt tracking pixel
+      description: |
+        **FR-018**: Called when customer opens SMS link and quote view page loads.
+        Returns 1×1 transparent GIF (tracking pixel).
+        Records sms_event {opened} and updates lead status → "opened".
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Quote ID for read-receipt tracking
+      responses:
+        '200':
+          description: 1×1 transparent GIF
+          content:
+            image/gif:
+              example: (binary GIF data)
+
+  /fsm/{provider}/oauth/start:
+    get:
+      tags:
+        - FSM
+      summary: Start FSM OAuth flow
+      description: |
+        **FR-027, FR-028**: Redirect to ServiceM8 or Tradify OAuth authorization.
+        Generates CSRF state token (stored in Redis for 10 min).
+
+        Supported providers: servicem8, tradify
+
+        Rate limit: 30/hr per crew
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ["servicem8", "tradify"]
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+        '400':
+          description: Unknown FSM provider
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: FSM provider OAuth not configured
+
+  /fsm/{provider}/oauth/callback:
+    get:
+      tags:
+        - FSM
+      summary: FSM OAuth callback
+      description: |
+        **FR-027, FR-028**: Receive OAuth authorization code from FSM provider.
+        Exchanges code for access token. Stores encrypted token in fsm_connections table.
+        Redirects back to app settings page on success.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ["servicem8", "tradify"]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth authorization code
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: CSRF state token
+      responses:
+        '302':
+          description: Redirect to app settings page
+
+  /notifications/push/subscribe:
+    post:
+      tags:
+        - Notifications
+      summary: Register web push subscription
+      description: |
+        **FR-032**: Save VAPID web push subscription after user grants permission.
+        Called by PWA service worker.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscribeReq'
+            example:
+              endpoint: "https://fcm.googleapis.com/fcm/send/..."
+              keys:
+                p256dh: "base64-encoded-p256dh"
+                auth: "base64-encoded-auth"
+      responses:
+        '200':
+          description: Subscription saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Failed to save subscription
+
+    delete:
+      tags:
+        - Notifications
+      summary: Unsubscribe from web push
+      description: |
+        **FR-032**: Remove a web push subscription.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint:
+                  type: string
+                  format: uri
+              required:
+                - endpoint
+      responses:
+        '204':
+          description: Subscription removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    # Auth
+    OtpStartReq:
+      type: object
+      properties:
+        phone:
+          type: string
+          pattern: '^\+614\d{8}$'
+          example: "+61412345678"
+      required:
+        - phone
+
+    OtpStartRes:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        messageId:
+          type: string
+          nullable: true
+
+    OtpVerifyReq:
+      type: object
+      properties:
+        phone:
+          type: string
+          pattern: '^\+614\d{8}$'
+        token:
+          type: string
+          pattern: '^\d{6}$'
+      required:
+        - phone
+        - token
+
+    OtpVerifyRes:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        onboarding_required:
+          type: boolean
+        user_id:
+          type: string
+          format: uuid
+      required:
+        - access_token
+        - refresh_token
+        - onboarding_required
+        - user_id
+
+    OnboardingReq:
+      type: object
+      properties:
+        business_name:
+          type: string
+          minLength: 2
+          maxLength: 128
+        trade_type:
+          type: string
+          enum:
+            - roofer
+            - painter
+            - electrician
+            - plumber
+            - landscaper
+        nsw_licence_number:
+          type: string
+          minLength: 4
+          maxLength: 32
+        default_labour_rate_aud:
+          type: number
+          minimum: 0
+          maximum: 1000
+        abn:
+          type: string
+          pattern: '^\d{11}$'
+          nullable: true
+      required:
+        - business_name
+        - trade_type
+        - nsw_licence_number
+        - default_labour_rate_aud
+
+    OnboardingRes:
+      type: object
+      properties:
+        crew_id:
+          type: string
+          format: uuid
+        licence_verified:
+          type: boolean
+        licence_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    LicenceValidateReq:
+      type: object
+      properties:
+        nsw_licence_number:
+          type: string
+          minLength: 4
+          maxLength: 32
+      required:
+        - nsw_licence_number
+
+    LicenceValidateRes:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        licence_holder_name:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    # Leads
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        crew_id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum:
+            - da
+            - manual
+            - inbound_sms
+        da_reference:
+          type: string
+          nullable: true
+        customer_name:
+          type: string
+        customer_mobile:
+          type: string
+          nullable: true
+        customer_email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        description:
+          type: string
+          maxLength: 280
+          nullable: true
+        status:
+          type: string
+          enum:
+            - "new"
+            - "generating"
+            - "draft_ready"
+            - "sent"
+            - "delivered"
+            - "opened"
+            - "won"
+            - "lost"
+        sms_disabled_followup:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ManualLeadReq:
+      type: object
+      properties:
+        customer_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        customer_mobile:
+          type: string
+          pattern: '^\+614\d{8}$'
+          nullable: true
+        customer_email:
+          type: string
+          format: email
+          nullable: true
+        address:
+          type: string
+          maxLength: 512
+          nullable: true
+        description:
+          type: string
+          maxLength: 280
+          nullable: true
+      required:
+        - customer_name
+
+    LeadPatchReq:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - "new"
+            - "generating"
+            - "draft_ready"
+            - "sent"
+            - "delivered"
+            - "opened"
+            - "won"
+            - "lost"
+        description:
+          type: string
+          maxLength: 280
+          nullable: true
+        sms_disabled_followup:
+          type: boolean
+        customer_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        customer_mobile:
+          type: string
+          pattern: '^\+614\d{8}$'
+          nullable: true
+        customer_email:
+          type: string
+          format: email
+          nullable: true
+        address:
+          type: string
+          maxLength: 512
+          nullable: true
+
+    DaWebhookReq:
+      type: object
+      properties:
+        da_reference:
+          type: string
+          minLength: 1
+          maxLength: 128
+        address:
+          type: string
+          minLength: 1
+          maxLength: 512
+        description:
+          type: string
+          maxLength: 1024
+          nullable: true
+        council:
+          type: string
+          maxLength: 128
+          nullable: true
+        received_at:
+          type: string
+          format: date-time
+          nullable: true
+        customer_name:
+          type: string
+          maxLength: 128
+          nullable: true
+        customer_mobile:
+          type: string
+          pattern: '^\+614\d{8}$'
+          nullable: true
+      required:
+        - da_reference
+        - address
+
+    # Photos
+    Photo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lead_id:
+          type: string
+          format: uuid
+        gcs_path:
+          type: string
+        exif_data:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+            timestamp:
+              type: string
+            device:
+              type: string
+          nullable: true
+        uploaded_at:
+          type: string
+          format: date-time
+
+    PhotoUploadInitReq:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 15
+        mime_types:
+          type: array
+          items:
+            type: string
+            enum:
+              - image/jpeg
+              - image/png
+              - image/heic
+              - image/webp
+          minItems: 1
+          maxItems: 15
+      required:
+        - count
+        - mime_types
+
+    PhotoUploadInitRes:
+      type: object
+      properties:
+        uploads:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              signed_url:
+                type: string
+                format: uri
+              gcs_path:
+                type: string
+              expires_at:
+                type: string
+                format: date-time
+            required:
+              - index
+              - signed_url
+              - gcs_path
+              - expires_at
+
+    PhotoCommitReq:
+      type: object
+      properties:
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              gcs_path:
+                type: string
+              exif_data:
+                type: object
+                properties:
+                  lat:
+                    type: number
+                  lng:
+                    type: number
+                  timestamp:
+                    type: string
+                  device:
+                    type: string
+                nullable: true
+            required:
+              - gcs_path
+          minItems: 1
+          maxItems: 15
+      required:
+        - photos
+
+    # Quotes
+    Quote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lead_id:
+          type: string
+          format: uuid
+        crew_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - "draft"
+            - "approved"
+            - "sent"
+            - "accepted"
+            - "declined"
+        subtotal_aud:
+          type: number
+          example: 1000.00
+        gst_aud:
+          type: number
+          example: 100.00
+        total_aud:
+          type: number
+          example: 1100.00
+        licence_number_snapshot:
+          type: string
+          nullable: true
+        licence_verified_snapshot:
+          type: boolean
+          nullable: true
+        statutory_warranty_text:
+          type: string
+          nullable: true
+        pdf_gcs_path:
+          type: string
+          nullable: true
+        pdf_signed_url:
+          type: string
+          format: uri
+          nullable: true
+        pdf_signed_url_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        rate_card_source:
+          type: string
+          enum:
+            - "live"
+            - "cached"
+            - "learned"
+        created_at:
+          type: string
+          format: date-time
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    QuoteLineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quote_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          example: "Colorbond roof (20 sq m)"
+        qty:
+          type: number
+          example: 20
+        unit:
+          type: string
+          example: "sq m"
+        unit_price_aud:
+          type: number
+          example: 45.50
+        kind:
+          type: string
+          enum:
+            - "material"
+            - "labour"
+          example: "material"
+        confidence_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 92
+        sort_order:
+          type: integer
+          example: 0
+
+    QuoteEnqueueReq:
+      type: object
+      properties:
+        context:
+          type: string
+          maxLength: 280
+          nullable: true
+          example: "Re-roof, colorbond, single-storey, gutters too"
+
+    QuoteEnqueueRes:
+      type: object
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - "generating"
+
+    LineItemPatchReq:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 280
+          nullable: true
+        qty:
+          type: number
+          minimum: 0
+          nullable: true
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 32
+          nullable: true
+        unit_price_aud:
+          type: number
+          minimum: 0
+          nullable: true
+
+    SendReq:
+      type: object
+      properties:
+        sms_body:
+          type: string
+          maxLength: 160
+          nullable: true
+
+    AcceptReq:
+      type: object
+      properties:
+        signed_token:
+          type: string
+        customer_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          nullable: true
+      required:
+        - signed_token
+
+    DeclineReq:
+      type: object
+      properties:
+        signed_token:
+          type: string
+        reason:
+          type: string
+          maxLength: 280
+          nullable: true
+      required:
+        - signed_token
+
+    PushSubscribeReq:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          format: uri
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+          required:
+            - p256dh
+            - auth
+      required:
+        - endpoint
+        - keys
+
+  parameters:
+    LeadId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    QuoteId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request format or validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: object
+                nullable: true
+
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    UnprocessableEntity:
+      description: Request validation failed (422)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: object
+                nullable: true
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+          headers:
+            Retry-After:
+              schema:
+                type: string
+              description: Seconds until rate limit reset
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token from /auth/otp endpoint
