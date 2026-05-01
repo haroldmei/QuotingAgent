@@ -97,3 +97,7 @@ End-to-end target: **< 5 minutes** from photo upload to SMS delivered.
 - `pnpm test:e2e` — Playwright (chromium + mobile-android; set
   `ENABLE_WEBKIT=1` if your host has GTK4 deps)
 - `pnpm db:studio` — open Prisma Studio at <http://localhost:5555>
+
+## Deploying
+
+For staging / production deploy to Vercel — `docs/19-deploy-runbook.md`.
