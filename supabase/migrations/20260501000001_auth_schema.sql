@@ -15,7 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Supabase injects user_metadata into the JWT via the dashboard setting:
 --   "Additional claims": { "crew_id": "{{user_metadata.crew_id}}" }
 -- ============================================================================
-CREATE OR REPLACE FUNCTION auth.crew_id()
+CREATE OR REPLACE FUNCTION public.app_crew_id()
   RETURNS uuid
   LANGUAGE sql
   STABLE

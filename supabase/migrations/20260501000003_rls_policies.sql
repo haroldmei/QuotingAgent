@@ -6,18 +6,18 @@
 --
 -- Design (docs/03-system-design.md §3.1):
 --   Every table with crew_id carries:
---     SELECT/UPDATE/DELETE: USING (crew_id = auth.crew_id())
---     INSERT:               WITH CHECK (crew_id = auth.crew_id())
+--     SELECT/UPDATE/DELETE: USING (crew_id = public.app_crew_id())
+--     INSERT:               WITH CHECK (crew_id = public.app_crew_id())
 --   Indirect ownership (photo → lead.crew_id) uses EXISTS sub-select.
 --   Cloud Run worker uses service role with explicit set_config() per job.
 --   rate_card_* and quote_acceptances are tenant-agnostic (no RLS).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- Helper: ensure the auth.crew_id() function exists before policies run
+-- Helper: ensure the public.app_crew_id() function exists before policies run
 -- (also defined in 000001, kept here for idempotency)
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION auth.crew_id()
+CREATE OR REPLACE FUNCTION public.app_crew_id()
   RETURNS uuid
   LANGUAGE sql
   STABLE
@@ -55,13 +55,13 @@ ALTER TABLE public.push_subscriptions  ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "crews_select_own" ON public.crews;
 CREATE POLICY "crews_select_own"
   ON public.crews FOR SELECT
-  USING (id = auth.crew_id());
+  USING (id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "crews_update_own" ON public.crews;
 CREATE POLICY "crews_update_own"
   ON public.crews FOR UPDATE
-  USING (id = auth.crew_id())
-  WITH CHECK (id = auth.crew_id());
+  USING (id = public.app_crew_id())
+  WITH CHECK (id = public.app_crew_id());
 
 -- INSERT is performed by the service role during onboarding (no user JWT yet)
 
@@ -87,23 +87,23 @@ CREATE POLICY "users_update_own"
 DROP POLICY IF EXISTS "leads_select_crew" ON public.leads;
 CREATE POLICY "leads_select_crew"
   ON public.leads FOR SELECT
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "leads_insert_crew" ON public.leads;
 CREATE POLICY "leads_insert_crew"
   ON public.leads FOR INSERT
-  WITH CHECK (crew_id = auth.crew_id());
+  WITH CHECK (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "leads_update_crew" ON public.leads;
 CREATE POLICY "leads_update_crew"
   ON public.leads FOR UPDATE
-  USING (crew_id = auth.crew_id())
-  WITH CHECK (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id())
+  WITH CHECK (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "leads_delete_crew" ON public.leads;
 CREATE POLICY "leads_delete_crew"
   ON public.leads FOR DELETE
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 -- ---------------------------------------------------------------------------
 -- photos: indirect ownership via lead.crew_id
@@ -115,7 +115,7 @@ CREATE POLICY "photos_select_crew"
     EXISTS (
       SELECT 1 FROM public.leads l
       WHERE l.id = photos.lead_id
-        AND l.crew_id = auth.crew_id()
+        AND l.crew_id = public.app_crew_id()
     )
   );
 
@@ -126,7 +126,7 @@ CREATE POLICY "photos_insert_crew"
     EXISTS (
       SELECT 1 FROM public.leads l
       WHERE l.id = photos.lead_id
-        AND l.crew_id = auth.crew_id()
+        AND l.crew_id = public.app_crew_id()
     )
   );
 
@@ -137,7 +137,7 @@ CREATE POLICY "photos_delete_crew"
     EXISTS (
       SELECT 1 FROM public.leads l
       WHERE l.id = photos.lead_id
-        AND l.crew_id = auth.crew_id()
+        AND l.crew_id = public.app_crew_id()
     )
   );
 
@@ -147,18 +147,18 @@ CREATE POLICY "photos_delete_crew"
 DROP POLICY IF EXISTS "quotes_select_crew" ON public.quotes;
 CREATE POLICY "quotes_select_crew"
   ON public.quotes FOR SELECT
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "quotes_insert_crew" ON public.quotes;
 CREATE POLICY "quotes_insert_crew"
   ON public.quotes FOR INSERT
-  WITH CHECK (crew_id = auth.crew_id());
+  WITH CHECK (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "quotes_update_crew" ON public.quotes;
 CREATE POLICY "quotes_update_crew"
   ON public.quotes FOR UPDATE
-  USING (crew_id = auth.crew_id())
-  WITH CHECK (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id())
+  WITH CHECK (crew_id = public.app_crew_id());
 
 -- ---------------------------------------------------------------------------
 -- quote_line_items: indirect ownership via quote.crew_id
@@ -170,7 +170,7 @@ CREATE POLICY "line_items_select_crew"
     EXISTS (
       SELECT 1 FROM public.quotes q
       WHERE q.id = quote_line_items.quote_id
-        AND q.crew_id = auth.crew_id()
+        AND q.crew_id = public.app_crew_id()
     )
   );
 
@@ -181,7 +181,7 @@ CREATE POLICY "line_items_insert_crew"
     EXISTS (
       SELECT 1 FROM public.quotes q
       WHERE q.id = quote_line_items.quote_id
-        AND q.crew_id = auth.crew_id()
+        AND q.crew_id = public.app_crew_id()
     )
   );
 
@@ -192,14 +192,14 @@ CREATE POLICY "line_items_update_crew"
     EXISTS (
       SELECT 1 FROM public.quotes q
       WHERE q.id = quote_line_items.quote_id
-        AND q.crew_id = auth.crew_id()
+        AND q.crew_id = public.app_crew_id()
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.quotes q
       WHERE q.id = quote_line_items.quote_id
-        AND q.crew_id = auth.crew_id()
+        AND q.crew_id = public.app_crew_id()
     )
   );
 
@@ -213,7 +213,7 @@ CREATE POLICY "sms_events_select_crew"
     EXISTS (
       SELECT 1 FROM public.quotes q
       WHERE q.id = sms_events.quote_id
-        AND q.crew_id = auth.crew_id()
+        AND q.crew_id = public.app_crew_id()
     )
   );
 
@@ -225,12 +225,12 @@ CREATE POLICY "sms_events_select_crew"
 DROP POLICY IF EXISTS "job_completions_select_crew" ON public.job_completions;
 CREATE POLICY "job_completions_select_crew"
   ON public.job_completions FOR SELECT
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "job_completions_insert_crew" ON public.job_completions;
 CREATE POLICY "job_completions_insert_crew"
   ON public.job_completions FOR INSERT
-  WITH CHECK (crew_id = auth.crew_id());
+  WITH CHECK (crew_id = public.app_crew_id());
 
 -- ---------------------------------------------------------------------------
 -- fsm_connections: crew_id direct
@@ -238,23 +238,23 @@ CREATE POLICY "job_completions_insert_crew"
 DROP POLICY IF EXISTS "fsm_connections_select_crew" ON public.fsm_connections;
 CREATE POLICY "fsm_connections_select_crew"
   ON public.fsm_connections FOR SELECT
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "fsm_connections_insert_crew" ON public.fsm_connections;
 CREATE POLICY "fsm_connections_insert_crew"
   ON public.fsm_connections FOR INSERT
-  WITH CHECK (crew_id = auth.crew_id());
+  WITH CHECK (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "fsm_connections_update_crew" ON public.fsm_connections;
 CREATE POLICY "fsm_connections_update_crew"
   ON public.fsm_connections FOR UPDATE
-  USING (crew_id = auth.crew_id())
-  WITH CHECK (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id())
+  WITH CHECK (crew_id = public.app_crew_id());
 
 DROP POLICY IF EXISTS "fsm_connections_delete_crew" ON public.fsm_connections;
 CREATE POLICY "fsm_connections_delete_crew"
   ON public.fsm_connections FOR DELETE
-  USING (crew_id = auth.crew_id());
+  USING (crew_id = public.app_crew_id());
 
 -- ---------------------------------------------------------------------------
 -- followup_schedules: indirect ownership via lead.crew_id
@@ -266,7 +266,7 @@ CREATE POLICY "followup_select_crew"
     EXISTS (
       SELECT 1 FROM public.leads l
       WHERE l.id = followup_schedules.lead_id
-        AND l.crew_id = auth.crew_id()
+        AND l.crew_id = public.app_crew_id()
     )
   );
 
