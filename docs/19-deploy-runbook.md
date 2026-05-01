@@ -170,6 +170,83 @@ For **production** the script does **not** auto-unprotect — that's a
 deliberate choice you make in the dashboard once you have a custom
 domain.
 
+## Sample tradie account (staging)
+
+Once the deploy is green and Supabase phone auth is wired, you can seed a
+fully-populated demo account so clicking through `/login → /onboarding →
+/leads` lands on a populated inbox instead of an empty state.
+
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_...
+scripts/seed-staging.sh
+```
+
+What it creates (idempotent — re-runs upsert via deterministic UUID5 keys):
+
+| Surface | Record |
+|---|---|
+| Supabase auth | user for `+61400000000` (created on first OTP verify) |
+| `public.crews` | "Sydney Roofing Co" — roofer, NSW licence `L001234567` (marked verified), $95/hr labour, ABN `12345678901` |
+| `public.users` | links the auth user → crew, role `owner` |
+| Supabase `app_metadata.crew_id` | set on the auth user so the JWT carries `crew_id` (RLS scoping works) |
+| `public.leads` | 5 leads — 1 `won`, 1 `sent`, 3 `new` (mix of DA + manual sources, 2h–14d old) |
+| `public.quotes` | 1 sent quote (A$12,450 incl. GST) on the `sent` lead |
+| `public.quote_line_items` | 3 lines on that quote (Colorbond / skylights / labour) |
+
+### Sign-in walkthrough
+
+1. Visit `${NEXT_PUBLIC_APP_URL}/login`
+2. Enter `+61400000000` — no real SMS sent (Supabase `sms_test_otp`)
+3. Enter the static OTP `000000`
+4. App routes you to `/leads` (not `/onboarding`, because `crew_id` is
+   already in `app_metadata`)
+5. The Leads tab shows 5 cards with the seeded data; the Quotes tab
+   shows the sent quote
+
+### Account credentials
+
+| Field | Value |
+|---|---|
+| Phone | `+61400000000` |
+| Test OTP | `000000` |
+| `auth.users.id` | `fc3159e5-bd11-4ad8-b844-ec19bdd06970` |
+| `crews.id` | `a4cdf6f3-5464-5a55-80b9-098d29b86675` |
+| Business name | Sydney Roofing Co |
+| Trade type | roofer |
+| NSW licence | L001234567 (marked verified at seed time) |
+
+Both UUIDs are deterministic UUID5 values derived from constant strings
+(`staging-sample-crew`, `staging-sample-lead-1..5`, `staging-sample-quote`,
+`staging-sample-li-1..3`), so re-running the seed never duplicates rows.
+
+### Removing the sample account
+
+```bash
+psql "$DATABASE_URL" -c "
+  DELETE FROM public.crews WHERE id = 'a4cdf6f3-5464-5a55-80b9-098d29b86675';
+  -- Cascades to users, leads, quotes, line_items, etc.
+"
+# Optional: also delete the auth user via Admin API
+curl -X DELETE \
+  -H \"apikey: \$SUPABASE_SERVICE_ROLE_KEY\" \
+  -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" \
+  \"\$NEXT_PUBLIC_SUPABASE_URL/auth/v1/admin/users/fc3159e5-bd11-4ad8-b844-ec19bdd06970\"
+```
+
+### Production note
+
+`sms_test_otp` is a **back door** — anyone who knows `+61400000000`
++ `000000` signs in as the demo crew. Before pointing real users at this
+deploy, clear it:
+
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+  -d '{"sms_test_otp": "", "sms_test_otp_valid_until": null}'
+```
+
 ## Upgrading from staging stubs to real services
 
 The first deploy uses two stubs that need replacing before the wedge
@@ -208,6 +285,41 @@ flow actually works end-to-end:
    ```
 
 5. Re-run `scripts/deploy.sh staging env-up && scripts/deploy.sh staging deploy`.
+
+### Wire phone-OTP via Twilio Verify
+
+Twilio Verify is purpose-built for OTPs (free quota, no phone number needed,
+works on trial Twilio accounts). Set it up once with the Management API:
+
+```bash
+# 1. Create a Twilio Verify Service (free, no phone number purchase required)
+TW_SID="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+TW_TOKEN="your-twilio-auth-token"
+VERIFY_SID=$(curl -sS -u "$TW_SID:$TW_TOKEN" \
+  -X POST "https://verify.twilio.com/v2/Services" \
+  --data-urlencode "FriendlyName=QuotingAgent OTP" \
+  --data-urlencode "CodeLength=6" | jq -r '.sid')
+
+# 2. Wire it into Supabase auth config (note the field name —
+#    sms_twilio_verify_message_service_sid, NOT sms_twilio_verify_service_sid)
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+  -d "{
+    \"external_phone_enabled\": true,
+    \"sms_provider\": \"twilio_verify\",
+    \"sms_twilio_verify_account_sid\": \"$TW_SID\",
+    \"sms_twilio_verify_auth_token\": \"$TW_TOKEN\",
+    \"sms_twilio_verify_message_service_sid\": \"$VERIFY_SID\",
+    \"sms_otp_length\": 6,
+    \"sms_otp_exp\": 600
+  }"
+```
+
+After this, `POST /api/auth/otp` on the deployed app actually sends an
+OTP via Twilio Verify (or returns the static one if the phone is in
+`sms_test_otp`).
 
 ### Real Upstash (required for production traffic)
 
