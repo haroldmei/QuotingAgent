@@ -15,7 +15,17 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA extensions;
 
 -- Make uuid-ossp + pgcrypto callable without schema prefix (matches Supabase default).
-ALTER DATABASE quotingagent SET search_path TO public, extensions;
+-- Use current_database() so this works on any DB name (local "quotingagent",
+-- Neon "neondb", hosted Supabase "postgres", etc.).
+DO $bootstrap$
+DECLARE
+  db_name text := current_database();
+BEGIN
+  EXECUTE format('ALTER DATABASE %I SET search_path TO public, extensions', db_name);
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'skipping ALTER DATABASE search_path (no permission on %)', db_name;
+END $bootstrap$;
 
 -- 2. auth schema + minimal users table
 CREATE SCHEMA IF NOT EXISTS auth;

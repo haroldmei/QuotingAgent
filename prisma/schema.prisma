@@ -12,7 +12,10 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  extensions = [pgvector(map: "vector", schema: "extensions")]
+  // pgvector is required for rate-card embeddings. We don't pin a schema
+  // because hosted Postgres providers (Neon, Supabase, RDS) install it in
+  // different schemas — and a non-superuser can't ALTER EXTENSION SET SCHEMA.
+  extensions = [pgvector(map: "vector")]
 }
 
 // ---------------------------------------------------------------------------

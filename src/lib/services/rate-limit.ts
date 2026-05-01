@@ -60,15 +60,19 @@ export function createRateLimiter(
   window: `${number}s` | `${number}m` | `${number}h` | `${number}d`
 ): Ratelimit {
   if (!hasUpstashConfig()) {
-    if (process.env.NODE_ENV === "production") {
-      // Hard fail in production — missing Upstash config is a deployment error.
+    // Staging is allowed to run without Upstash (no real users, low traffic).
+    // Production-grade traffic must have it; the build/import time will warn.
+    const isProdRuntime =
+      process.env.NODE_ENV === "production" && process.env.STAGE !== "staging";
+    if (isProdRuntime) {
       throw new Error(
         `[rate-limit] Upstash env vars are required in production (prefix: ${prefix}).`
       );
     }
-    // One-time warning per unique prefix in dev
     console.warn(
-      `[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN not set — using no-op limiter for "${prefix}" (dev only)`
+      `[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN not set — using no-op limiter for "${prefix}" (${
+        process.env.STAGE ?? process.env.NODE_ENV ?? "dev"
+      })`
     );
     return noopLimiter;
   }
