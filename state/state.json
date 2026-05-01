@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-04-27T05:40:27Z",
+  "product_idea": "demo: a tax-prep co-pilot",
+  "wedge_sentence": "Two-click tax filing for solo Shopify bookkeepers.",
+  "icp": null,
+  "axis": null,
+  "anti_axis": null,
+  "scale_tier": "preview",
+  "current_phase": "ceo",
+  "phase_status": {},
+  "critic_verdicts": {},
+  "kill_switches": [],
+  "decisions": [
+    {
+      "date": "2026-04-27",
+      "phase": "differentiation",
+      "decision": "axis = niche-depth",
+      "reason": "Shopify DTC bookkeepers under-served by generalist tools"
+    }
+  ],
+  "open_issues": [],
+  "kpi_targets": {},
+  "signal_sources": {
+    "posthog": {
+      "enabled": false,
+      "last_pull": null
+    },
+    "sentry": {
+      "enabled": false,
+      "last_pull": null
+    },
+    "support": {
+      "enabled": false,
+      "last_pull": null
+    }
+  }
+}
