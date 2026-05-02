@@ -61,12 +61,12 @@ test.describe("Root routing", () => {
       return;
     }
     // Check if QuotingAgent brand text is present — if not (e.g. 500 page), skip
-    const brandVisible = await page.getByText("QuotingAgent").isVisible().catch(() => false);
+    const brandVisible = await page.getByText("QuotingAgent").first().isVisible().catch(() => false);
     if (!brandVisible) {
       test.skip(true, "Dev server not fully configured — /login page content not rendered");
       return;
     }
-    await expect(page.getByText("QuotingAgent")).toBeVisible();
+    await expect(page.getByText("QuotingAgent").first()).toBeVisible();
   });
 
   test("PWA manifest is linked in the HTML head", async ({ page }) => {
@@ -308,12 +308,12 @@ test.describe("Responsive layout — 1280px desktop", () => {
       test.skip(true, "MIDDLEWARE BUG: /login → /auth/sign-in (404)");
       return;
     }
-    const brandVisible = await page.getByText("QuotingAgent").isVisible().catch(() => false);
+    const brandVisible = await page.getByText("QuotingAgent").first().isVisible().catch(() => false);
     if (!brandVisible) {
       test.skip(true, "Dev server not configured — /login page not rendered correctly");
       return;
     }
-    await expect(page.getByText("QuotingAgent")).toBeVisible();
+    await expect(page.getByText("QuotingAgent").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /send me a code/i })).toBeVisible();
   });
 

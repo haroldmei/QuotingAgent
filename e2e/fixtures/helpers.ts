@@ -174,7 +174,15 @@ export async function mockLicenceValidationInvalid(page: Page) {
  */
 export async function mockOtpSend(page: Page) {
   await page.route("**/api/auth/otp", async (route) => {
-    const body = await route.request().postDataJSON().catch(() => ({}));
+    // postDataJSON() is synchronous and returns null on parse failure; wrap
+    // in try/catch instead of awaiting + .catch (which throws "not a function"
+    // on Playwright >= 1.50).
+    let body: Record<string, unknown> = {};
+    try {
+      body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
     if (body?.action === "send") {
       await route.fulfill({
         status: 200,
