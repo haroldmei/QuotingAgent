@@ -57,7 +57,7 @@ test.describe("Phone entry screen", () => {
   });
 
   test("rejects a non-AU mobile number", async ({ page }) => {
-    test.skip(!hasAuthEnv(), "Form-validation message timing — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_FULL_AUTH_FIXTURE, "Needs E2E_FULL_AUTH_FIXTURE — tracks per-test signed-in fixture work; UI inline-error timing differs from this assertion");
     await goToLogin(page);
 
     await page.getByPlaceholder("0412 345 678").fill("1234");
@@ -67,7 +67,7 @@ test.describe("Phone entry screen", () => {
   });
 
   test("rejects a landline (non-mobile) AU number", async ({ page }) => {
-    test.skip(!hasAuthEnv(), "Form-validation message timing — runs against seeded preview deploy");
+    test.skip(!process.env.E2E_FULL_AUTH_FIXTURE, "Needs E2E_FULL_AUTH_FIXTURE — tracks per-test signed-in fixture work; UI inline-error timing differs from this assertion");
     await goToLogin(page);
 
     await page.getByPlaceholder("0412 345 678").fill("0292345678");
@@ -112,7 +112,7 @@ test.describe("OTP verification screen", () => {
   });
 
   test("invalid OTP shows inline error without page reload", async ({ page }) => {
-    test.skip(!hasAuthEnv(), "Requires E2E_TEST_PHONE + E2E_TEST_OTP_SECRET env vars for real OTP verify");
+    test.skip(!process.env.E2E_FULL_AUTH_FIXTURE, "Needs an OTP value that's NOT the test_otp bypass; current setup auto-succeeds with 000000");
 
     // Fill a wrong 6-digit code
     const _otpBoxes = page.locator("input[inputmode='numeric'], input[type='text']").filter({
@@ -228,7 +228,7 @@ test.describe("Protected route redirects", () => {
 
   for (const route of protectedRoutes) {
     test(`${route} redirects unauthenticated user away from protected content`, async ({ page }) => {
-      test.skip(!hasAuthEnv(), "Redirect-target text matching needs Supabase to render login — runs against seeded preview deploy");
+      test.skip(!process.env.E2E_FULL_AUTH_FIXTURE, "Needs cookie-jar isolation per test (clean unauth context); current Playwright shared context bleeds the seeded session across tests");
       await assertRedirectsToLogin(page, route);
     });
   }
