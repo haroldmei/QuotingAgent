@@ -21,7 +21,10 @@ CREATE OR REPLACE FUNCTION public.app_crew_id()
   STABLE
   SECURITY DEFINER
 AS $$
+  -- Supabase nests custom claims under app_metadata. Try that path first;
+  -- fall back to top-level for app-issued JWTs (local dev / non-Supabase auth).
   SELECT COALESCE(
+    (current_setting('request.jwt.claims', TRUE)::jsonb -> 'app_metadata' ->> 'crew_id')::uuid,
     (current_setting('request.jwt.claims', TRUE)::jsonb ->> 'crew_id')::uuid,
     NULL
   );

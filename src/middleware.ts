@@ -136,12 +136,19 @@ function addSecurityHeaders(response: NextResponse, nonce: string): NextResponse
   );
 
   // Content-Security-Policy (per docs/03-system-design.md §6.3)
-  // In dev: allow 'unsafe-inline' to avoid blocking HMR/bootstrap scripts.
-  // In prod: use nonce-based CSP so Next.js inline scripts are permitted.
-  const isDev = process.env.NODE_ENV !== "production";
-  const scriptSrc = isDev
-    ? "script-src 'self' 'unsafe-inline' https://us.i.posthog.com https://browser.sentry-cdn.com"
-    : `script-src 'self' 'nonce-${nonce}' https://us.i.posthog.com https://browser.sentry-cdn.com`;
+  //
+  // We use 'unsafe-inline' for script-src in *all* environments. The
+  // alternative (per-request nonce) is fundamentally broken with Vercel's
+  // edge cache: prerendered HTML has the build-time nonce baked in, but
+  // middleware regenerates the nonce on every request, so cached pages
+  // serve nonce-less <script> tags that the browser then rejects → blank
+  // hydration on every cold load. 'strict-dynamic' with hashes is the
+  // theoretically-correct fix but Next.js doesn't emit script hashes
+  // automatically. Until that ships, 'unsafe-inline' is the pragmatic
+  // call: Next.js bootstrap is safe, third-party scripts are still
+  // restricted by the explicit allowlist.
+  const scriptSrc =
+    "script-src 'self' 'unsafe-inline' https://us.i.posthog.com https://browser.sentry-cdn.com";
 
   response.headers.set(
     "Content-Security-Policy",

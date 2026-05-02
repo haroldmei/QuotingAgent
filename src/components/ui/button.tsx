@@ -71,6 +71,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const Comp = asChild ? Slot : "button";
+
+    // Radix Slot requires a single React child. When asChild=true, we cannot
+    // inject the loader spinner alongside the user's child element — that
+    // would make Slot see two children (the spinner and the link/anchor)
+    // and throw at render time. asChild buttons therefore opt out of the
+    // loader UI; if you need a spinner, use a plain <Button> (no asChild).
+    const content =
+      !asChild && loading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          {loadingText ?? children}
+        </>
+      ) : (
+        children
+      );
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
@@ -79,8 +95,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-        {loading && loadingText ? loadingText : children}
+        {content}
       </Comp>
     );
   }

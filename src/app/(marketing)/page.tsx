@@ -1029,7 +1029,7 @@ export default async function MarketingPage() {
                   <ul className="flex flex-col gap-2">
                     <li>
                       <a
-                        href="/legal/privacy"
+                        href="/privacy"
                         className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
                       >
                         Privacy Policy
@@ -1037,10 +1037,18 @@ export default async function MarketingPage() {
                     </li>
                     <li>
                       <a
-                        href="/legal/terms"
+                        href="/terms"
                         className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
                       >
                         Terms of Service
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href="/cookies"
+                        className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                      >
+                        Cookies
                       </a>
                     </li>
                   </ul>
