@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: "Override the URL to test against (default: deploy a fresh preview)"
+        description: "URL to test against (default: wait for Vercel auto-deploy)"
         required: false
         default: ""
 
@@ -17,14 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy-and-test:
-    name: Deploy + run Playwright (auth-gated)
+  test-against-preview:
+    name: Wait for Vercel deploy + run Playwright
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
-    env:
-      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -45,63 +41,75 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       # ----------------------------------------------------------------
-      # Path A — deploy a fresh Vercel preview from this commit.
-      #         Used on PRs and `main` pushes when no override URL given.
+      # The Vercel GitHub integration auto-deploys every commit and posts
+      # a GitHub deployment status (state=success|failure, environment_url).
+      # We poll that API until we see a success → use that URL.
+      # No Vercel API token needed — just GITHUB_TOKEN.
       # ----------------------------------------------------------------
-      - name: Pull Vercel project config
-        if: ${{ github.event.inputs.base_url == '' }}
-        run: npx vercel@latest pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build for preview
-        if: ${{ github.event.inputs.base_url == '' }}
-        run: npx vercel@latest build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy preview
-        if: ${{ github.event.inputs.base_url == '' }}
-        id: deploy
+      - name: Resolve target URL
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OVERRIDE_URL: ${{ github.event.inputs.base_url }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          url=$(npx vercel@latest deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Preview URL: $url"
-
-      - name: Pick base URL
-        id: base
-        run: |
-          if [ -n "${{ github.event.inputs.base_url }}" ]; then
-            echo "url=${{ github.event.inputs.base_url }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "url=${{ steps.deploy.outputs.url }}" >> "$GITHUB_OUTPUT"
+          set -e
+          if [ -n "$OVERRIDE_URL" ]; then
+            echo "url=$OVERRIDE_URL" >> "$GITHUB_OUTPUT"
+            echo "Using override URL: $OVERRIDE_URL"
+            exit 0
           fi
 
-      - name: Wait for preview to respond
-        run: |
+          echo "Waiting for Vercel deployment status on commit $SHA"
           for i in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.base.outputs.url }}/" || echo "000")
+            # Find the most recent deployment for this commit
+            deploys=$(gh api "repos/$REPO/deployments?sha=$SHA&per_page=5" \
+              -q '[.[] | select(.environment | test("Production|Preview")) | .id]')
+            for did in $(echo "$deploys" | jq -r '.[]'); do
+              status=$(gh api "repos/$REPO/deployments/$did/statuses?per_page=1" \
+                -q '.[0] | {state, environment_url}')
+              state=$(echo "$status" | jq -r '.state')
+              url=$(echo "$status" | jq -r '.environment_url // empty')
+              if [ "$state" = "success" ] && [ -n "$url" ]; then
+                echo "url=$url" >> "$GITHUB_OUTPUT"
+                echo "✓ Vercel deploy ready: $url (deployment $did)"
+                exit 0
+              fi
+              if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+                echo "✗ Vercel deploy failed for $did" >&2
+                gh api "repos/$REPO/deployments/$did/statuses?per_page=1" -q '.[0]' >&2
+                exit 1
+              fi
+            done
+            echo "  attempt $i/60: no successful deploy yet, sleeping 15s"
+            sleep 15
+          done
+          echo "Timed out waiting for Vercel deploy" >&2
+          exit 1
+
+      - name: Sanity check the URL responds
+        run: |
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.target.outputs.url }}/" || echo "000")
             if [ "$code" = "200" ]; then
-              echo "Preview is live (HTTP $code)"
+              echo "✓ ${{ steps.target.outputs.url }} → HTTP $code"
               exit 0
             fi
             echo "  attempt $i: HTTP $code, retrying..."
             sleep 5
           done
-          echo "Preview did not respond with 200 within 5 minutes" >&2
+          echo "URL did not respond with 200" >&2
           exit 1
 
       # ----------------------------------------------------------------
-      # Run Playwright.
-      #
-      # globalSetup (e2e/global-setup.ts) signs in via the test phone
-      # ONCE and persists cookies + localStorage to playwright/.auth/user.json.
-      # Every test then loads that storage state (set in playwright.config.ts
-      # use.storageState) so it starts authenticated. Tests that need an
-      # unauth context override via test.use({ storageState: ... }).
-      #
-      # SKIP_WEB_SERVER=1 tells playwright.config.ts not to spawn its own
-      # dev server (we're testing the deployed preview).
+      # globalSetup signs in via /api/auth/otp with the test phone and
+      # writes the Supabase SSR cookie to playwright/.auth/user.json.
+      # use.storageState in playwright.config.ts loads it for every test.
       # ----------------------------------------------------------------
       - name: Run Playwright
         env:
-          PLAYWRIGHT_BASE_URL:  ${{ steps.base.outputs.url }}
+          PLAYWRIGHT_BASE_URL:  ${{ steps.target.outputs.url }}
           SKIP_WEB_SERVER:      "1"
           E2E_TEST_PHONE:       ${{ secrets.E2E_TEST_PHONE }}
           E2E_TEST_OTP_SECRET:  ${{ secrets.E2E_TEST_OTP_SECRET }}
@@ -133,7 +141,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const url = '${{ steps.base.outputs.url }}';
+            const url = '${{ steps.target.outputs.url }}';
             const status = '${{ job.status }}';
             const emoji = status === 'success' ? '✅' : '❌';
             github.rest.issues.createComment({
