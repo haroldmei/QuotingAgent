@@ -172,7 +172,12 @@ test.describe("Back navigation", () => {
 // Responsive layout — mobile 375px (primary target)
 // ---------------------------------------------------------------------------
 test.describe("Responsive layout — 375px mobile (iPhone SE)", () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  // Tests in this block visit /login; clear auth state so middleware doesn't
+  // redirect us to /leads (the global-setup signs in for the rest of the suite).
+  test.use({
+    viewport: { width: 375, height: 667 },
+    storageState: { cookies: [], origins: [] },
+  });
 
   test("login page fits viewport without horizontal scroll", async ({ page }) => {
     await page.goto("/login");
@@ -300,7 +305,11 @@ test.describe("Responsive layout — 375px mobile (iPhone SE)", () => {
 // Responsive layout — desktop 1280px
 // ---------------------------------------------------------------------------
 test.describe("Responsive layout — 1280px desktop", () => {
-  test.use({ viewport: { width: 1280, height: 720 } });
+  // /login redirects authed users to /leads; clear storage so we land on /login.
+  test.use({
+    viewport: { width: 1280, height: 720 },
+    storageState: { cookies: [], origins: [] },
+  });
 
   test("login page renders without layout breakage on desktop", async ({ page }) => {
     await page.goto("/login");

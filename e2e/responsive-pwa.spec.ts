@@ -24,7 +24,11 @@ const MOBILE_VIEWPORTS = [
 // ---------------------------------------------------------------------------
 for (const vp of MOBILE_VIEWPORTS) {
   test.describe(`Login page @ ${vp.name}`, () => {
-    test.use({ viewport: { width: vp.width, height: vp.height } });
+    // /login is the asserted page; auth state would redirect to /leads. Clear it.
+    test.use({
+      viewport: { width: vp.width, height: vp.height },
+      storageState: { cookies: [], origins: [] },
+    });
 
     test("renders without horizontal overflow", async ({ page }) => {
       await page.goto("/login");
