@@ -1,10 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
+import * as path from "node:path";
 
 /**
  * Playwright E2E configuration — QuotingAgent
  * Stack: Next.js 15 App Router, Supabase auth, mobile-first PWA
  * Coverage target: wedge flow (photo→SMS quote <5 min), auth, error states, responsive
  */
+
+// Authenticated storage state file written by e2e/global-setup.ts.
+// Tests that DON'T want auth (e.g. unauth-redirect tests) should override:
+//   test.use({ storageState: { cookies: [], origins: [] } })
+const STORAGE_STATE_PATH = path.join(
+  process.cwd(),
+  "playwright",
+  ".auth",
+  "user.json"
+);
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
@@ -15,11 +27,16 @@ export default defineConfig({
     ["html", { open: "never", outputFolder: "playwright-report" }],
     ["list"],
   ],
+  globalSetup: path.resolve("./e2e/global-setup.ts"),
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
     screenshot: "only-on-failure",
     trace: "on-first-retry",
     video: "on-first-retry",
+    // Storage state is only loaded if the file exists with non-empty content.
+    // global-setup writes an empty {cookies:[],origins:[]} if E2E_TEST_PHONE
+    // is unset, so this is safe even without auth envs.
+    storageState: STORAGE_STATE_PATH,
   },
   projects: [
     {

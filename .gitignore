@@ -21,6 +21,7 @@ out/
 playwright-report/
 test-results/
 coverage/
+playwright/.auth/
 
 # Local dogfood artifacts (screenshots, traces) — root only, not docs/dogfood/
 /dogfood/

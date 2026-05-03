@@ -88,35 +88,29 @@ jobs:
           exit 1
 
       # ----------------------------------------------------------------
-      # Run Playwright. Auth-gated tests pick up E2E_TEST_PHONE/SECRET.
+      # Run Playwright.
+      #
+      # globalSetup (e2e/global-setup.ts) signs in via the test phone
+      # ONCE and persists cookies + localStorage to playwright/.auth/user.json.
+      # Every test then loads that storage state (set in playwright.config.ts
+      # use.storageState) so it starts authenticated. Tests that need an
+      # unauth context override via test.use({ storageState: ... }).
+      #
       # SKIP_WEB_SERVER=1 tells playwright.config.ts not to spawn its own
       # dev server (we're testing the deployed preview).
-      #
-      # Notable env we deliberately do NOT set:
-      #   E2E_PROD_BUILD=1 — would unskip the wedge-flow.spec.ts CF-N
-      #   tests, but those assume a per-test empty-state fixture (they
-      #   don't sign in themselves) and currently fail against the
-      #   seeded staging account. Track in docs/19-deploy-runbook.md.
-      #
-      # Spec selection: only the suites that self-authenticate (or run
-      # without auth). This keeps the CI loop under ~5 minutes.
       # ----------------------------------------------------------------
       - name: Run Playwright
         env:
-          PLAYWRIGHT_BASE_URL: ${{ steps.base.outputs.url }}
-          SKIP_WEB_SERVER:     "1"
-          E2E_TEST_PHONE:      ${{ secrets.E2E_TEST_PHONE }}
-          E2E_TEST_OTP_SECRET: ${{ secrets.E2E_TEST_OTP_SECRET }}
-          CI:                  "true"
+          PLAYWRIGHT_BASE_URL:  ${{ steps.base.outputs.url }}
+          SKIP_WEB_SERVER:      "1"
+          E2E_TEST_PHONE:       ${{ secrets.E2E_TEST_PHONE }}
+          E2E_TEST_OTP_SECRET:  ${{ secrets.E2E_TEST_OTP_SECRET }}
+          CI:                   "true"
         run: |
           pnpm exec playwright test \
             --project=desktop-chrome \
             --reporter=list,html \
-            --retries=1 \
-            e2e/auth.spec.ts \
-            e2e/error-states.spec.ts \
-            e2e/navigation.spec.ts \
-            e2e/responsive-pwa.spec.ts
+            --retries=1
 
       - name: Upload Playwright HTML report
         if: always()
