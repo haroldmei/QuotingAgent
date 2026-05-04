@@ -23,12 +23,29 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const supabase = await createServerClient();
-  const { data: quote, error } = await supabase
+
+  // Accept either a quote_id or a lead_id. The leads list currently links via
+  // lead_id (`/quotes/{lead.id}/sent`); migrating those CTAs over time, but
+  // until then the API is the canonical place to handle the dual-key lookup.
+  let { data: quote, error } = await supabase
     .from("quotes")
     .select("*, quote_line_items(*), sms_events(*)")
     .eq("id", id)
     .eq("crew_id", crewId)
-    .single();
+    .maybeSingle();
+
+  if (!quote) {
+    const fallback = await supabase
+      .from("quotes")
+      .select("*, quote_line_items(*), sms_events(*)")
+      .eq("lead_id", id)
+      .eq("crew_id", crewId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    quote = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !quote) {
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });

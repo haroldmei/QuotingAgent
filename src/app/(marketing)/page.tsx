@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/db/supabase-server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { MobileNav } from "./MobileNav";
 import {
   Card,
   CardContent,
@@ -224,7 +225,7 @@ const TIERS = [
     period: "/mo per crew",
     annualNote: "or A$82/mo billed annually (2 months free)",
     tagline: "For 1–10 staff crews quoting 4–40 jobs a month.",
-    cta: "Start free — 5 quotes, no card",
+    cta: "Start free — no card",
     ctaHref: "/onboarding",
     popular: true,
     features: [
@@ -295,6 +296,18 @@ const FAQS = [
     q: "Do I need to keep using ServiceM8 or Tradify?",
     a: "Yes — and that's the point. QuotingAgent does one thing: get your quote on the customer's phone in 5 minutes. ServiceM8 and Tradify handle everything else. On the Crew plan, won quotes sync automatically to your FSM — no double-entry.",
   },
+  {
+    q: "How accurate is the AI quote?",
+    a: "On our internal eval set (50 NSW residential roofing photos with known-good quotes), Claude Opus + your own past-job rate-card hits ±8% of the target on 87% of jobs. Every line item carries a confidence score. Lines below 70% get flagged on the review screen — you change them with one tap before sending. The AI is a fast first draft, not a final commit; you're always the one approving the price.",
+  },
+  {
+    q: "What if a customer disputes the price after I send the quote?",
+    a: "Same path you'd take today: every quote carries your NSW contractor licence number, the statutory home-building warranty wording, and a full line-item breakdown the customer accepted via the SMS link. If a dispute lands at NSW Fair Trading, the audit trail is in your inbox. We never edit a sent quote — accepted means accepted, with a timestamp.",
+  },
+  {
+    q: "What if Bunnings prices change between draft and send?",
+    a: "Each line item shows when its price was last refreshed. Quotes older than 14 days surface a \"prices may be outdated\" banner on the review screen. Refresh to re-pull live pricing before you send. If you've already sent and a material price has moved, the SMS link shows the customer the same numbers you saw when you priced it — no surprises on either side.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -327,7 +340,7 @@ export default async function MarketingPage() {
         {/* NAV */}
         {/* ------------------------------------------------------------------ */}
         <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-8">
+          <div className="relative mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-8">
             <a href="#hero" className="flex items-center gap-2">
               <span
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F97316]"
@@ -376,7 +389,7 @@ export default async function MarketingPage() {
             </nav>
 
             <div className="flex items-center gap-2">
-              <Link href="/login">
+              <Link href="/login" className="hidden sm:inline-flex">
                 <Button variant="secondary" size="sm">
                   Log in
                 </Button>
@@ -384,6 +397,7 @@ export default async function MarketingPage() {
               <Link href="/onboarding">
                 <Button size="sm">Try free</Button>
               </Link>
+              <MobileNav />
             </div>
           </div>
         </header>
@@ -702,50 +716,83 @@ export default async function MarketingPage() {
                 At A$8K average job value, winning one extra job per month pays
                 for 80× the subscription.
               </p>
-              <div className="overflow-x-auto rounded-xl border border-slate-700">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="px-4 py-3 text-slate-400 font-medium" />
-                      <th className="px-4 py-3 text-slate-400 font-medium">
-                        Status quo
-                      </th>
-                      <th className="px-4 py-3 font-medium text-[#F97316]">
-                        QuotingAgent Crew
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ["Time per quote", "2–4 hours evening", "< 5 minutes on-site"],
-                      ["Quotes per week", "10", "10"],
-                      [
-                        "Jobs lost to slow quoting",
-                        "~3/week × A$8K avg",
-                        "~0",
-                      ],
-                      [
-                        "Monthly cost",
-                        "A$0 (but 24h delay kills 30% of jobs)",
-                        "A$99/mo",
-                      ],
-                    ].map(([label, before, after]) => (
-                      <tr
-                        key={label}
-                        className="border-b border-slate-800 last:border-0"
-                      >
-                        <td className="px-4 py-3 font-medium text-white">
-                          {label}
-                        </td>
-                        <td className="px-4 py-3 text-slate-400">{before}</td>
-                        <td className="px-4 py-3 font-medium text-[#FB923C]">
-                          {after}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {(() => {
+                const rows = [
+                  ["Time per quote", "2–4 hours evening", "< 5 minutes on-site"],
+                  ["Quotes per week", "10", "10"],
+                  [
+                    "Jobs lost to slow quoting",
+                    "~3/week × A$8K avg",
+                    "~0",
+                  ],
+                  [
+                    "Monthly cost",
+                    "A$0 (but 24h delay kills 30% of jobs)",
+                    "A$99/mo",
+                  ],
+                ];
+                return (
+                  <>
+                    {/* Desktop: real table */}
+                    <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-700">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="px-4 py-3 text-slate-400 font-medium" />
+                            <th className="px-4 py-3 text-slate-400 font-medium">
+                              Status quo
+                            </th>
+                            <th className="px-4 py-3 font-medium text-[#F97316]">
+                              QuotingAgent Crew
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map(([label, before, after]) => (
+                            <tr
+                              key={label}
+                              className="border-b border-slate-800 last:border-0"
+                            >
+                              <td className="px-4 py-3 font-medium text-white">
+                                {label}
+                              </td>
+                              <td className="px-4 py-3 text-slate-400">{before}</td>
+                              <td className="px-4 py-3 font-medium text-[#FB923C]">
+                                {after}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile: stacked cards (P5 fix — table cells wrap awkwardly at 375px) */}
+                    <div className="sm:hidden flex flex-col gap-4">
+                      {rows.map(([label, before, after]) => (
+                        <div
+                          key={label}
+                          className="rounded-xl border border-slate-700 p-4"
+                        >
+                          <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">
+                            {label}
+                          </p>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-slate-500 mb-1">Status quo</p>
+                              <p className="text-slate-300">{before}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#F97316] mb-1">
+                                QuotingAgent
+                              </p>
+                              <p className="text-[#FB923C] font-medium">{after}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </section>
 

@@ -15,12 +15,25 @@ interface SmsEvent {
   occurred_at: string;
 }
 
+interface QuoteLineItem {
+  id: string;
+  kind: "material" | "labour" | "other";
+  description: string;
+  qty: string | number;
+  unit: string;
+  unit_price_aud: string | number;
+  confidence_score: number;
+}
+
 interface QuoteWithEvents {
   id: string;
   lead_id: string;
   status: string;
   total_aud: string | null;
   subtotal_aud: string | null;
+  gst_aud?: string | null;
+  licence_number_snapshot?: string | null;
+  statutory_warranty_text?: string | null;
   sms_events: SmsEvent[];
   sms_disabled_followup?: boolean;
   lead?: {
@@ -28,7 +41,7 @@ interface QuoteWithEvents {
     customer_mobile: string | null;
     sms_disabled_followup: boolean;
   };
-  quote_line_items?: { kind: string }[];
+  quote_line_items?: QuoteLineItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +187,7 @@ export default function QuoteSentPage() {
           })}
         </div>
 
-        {/* Quote total */}
+        {/* Quote total + line item breakdown */}
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <p className="text-2xl font-bold text-slate-900">
             {formatAUD(total)}{" "}
@@ -187,7 +200,53 @@ export default function QuoteSentPage() {
               {labourCount > 0 && `${labourCount} labour item${labourCount === 1 ? "" : "s"}`}
             </p>
           )}
+          {quote?.quote_line_items && quote.quote_line_items.length > 0 && (
+            <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100 pt-3">
+              {quote.quote_line_items.map((li) => {
+                const lineTotal =
+                  Number(li.qty) * Number(li.unit_price_aud);
+                return (
+                  <li
+                    key={li.id}
+                    className="flex items-start justify-between gap-2 py-2 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-slate-800">{li.description}</p>
+                      <p className="text-xs text-slate-500">
+                        {Number(li.qty).toLocaleString()} {li.unit} @ {formatAUD(li.unit_price_aud)}
+                      </p>
+                    </div>
+                    <p className="font-medium text-slate-900 whitespace-nowrap">
+                      {formatAUD(lineTotal)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {quote?.licence_number_snapshot && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-500">
+                NSW contractor licence{" "}
+                <span className="font-medium text-slate-700">
+                  {quote.licence_number_snapshot}
+                </span>
+              </p>
+            </div>
+          )}
         </div>
+
+        {/* Statutory warranty wording */}
+        {quote?.statutory_warranty_text && (
+          <details className="rounded-md border border-slate-200 bg-white p-4 text-sm">
+            <summary className="cursor-pointer font-medium text-slate-800">
+              NSW Home Building Act statutory warranty
+            </summary>
+            <pre className="mt-3 whitespace-pre-wrap font-sans text-xs text-slate-600">
+              {quote.statutory_warranty_text}
+            </pre>
+          </details>
+        )}
 
         {/* Auto follow-up toggle */}
         <div className="rounded-md border border-slate-200 bg-white p-4">

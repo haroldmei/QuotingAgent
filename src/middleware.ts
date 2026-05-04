@@ -147,8 +147,10 @@ function addSecurityHeaders(response: NextResponse, nonce: string): NextResponse
   // automatically. Until that ships, 'unsafe-inline' is the pragmatic
   // call: Next.js bootstrap is safe, third-party scripts are still
   // restricted by the explicit allowlist.
+  // PostHog serves config from us-assets.i.posthog.com (separate from us.i.posthog.com).
+  // Vercel Live (preview-feedback widget) lives at vercel.live + iframes.
   const scriptSrc =
-    "script-src 'self' 'unsafe-inline' https://us.i.posthog.com https://browser.sentry-cdn.com";
+    "script-src 'self' 'unsafe-inline' https://us.i.posthog.com https://us-assets.i.posthog.com https://browser.sentry-cdn.com https://vercel.live";
 
   response.headers.set(
     "Content-Security-Policy",
@@ -156,9 +158,13 @@ function addSecurityHeaders(response: NextResponse, nonce: string): NextResponse
       "default-src 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",  // Tailwind requires unsafe-inline in some builds
-      "img-src 'self' data: https://storage.googleapis.com",
+      // blob: needed for the optimistic photo-thumbnail preview
+      // (URL.createObjectURL). https://*.supabase.co covers signed-URL
+      // photo reads from Supabase Storage.
+      "img-src 'self' data: blob: https://storage.googleapis.com https://*.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co https://*.upstash.io https://api.anthropic.com https://api.twilio.com https://us.i.posthog.com https://*.ingest.sentry.io",
+      "connect-src 'self' https://*.supabase.co https://*.upstash.io https://api.anthropic.com https://api.twilio.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.sentry.io https://vercel.live wss://ws-us3.pusher.com",
+      "frame-src 'self' https://vercel.live",
       "media-src 'self'",
       "worker-src 'self'",  // Service worker for PWA
       "manifest-src 'self'",

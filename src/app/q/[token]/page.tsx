@@ -24,21 +24,29 @@ export async function generateMetadata(_props: PageProps): Promise<Metadata> {
 export default async function CustomerQuotePage({ params }: PageProps) {
   const { token } = await params;
 
-  // Fetch quote via the backend route (validates the HMAC signed token)
+  // Fetch quote via the backend route (validates the HMAC signed token).
+  // Any failure — invalid/expired/forwarded token, malformed JSON, network
+  // blip, server crash — must land on the friendly not-found page rather
+  // than Next's raw "Application error" fallback (the customer is the buyer
+  // here; that page looks like a phishing site).
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/quotes/${encodeURIComponent(token)}/view`, {
-    cache: "no-store",
-  });
-
-  if (res.status === 404 || res.status === 401 || res.status === 410) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let quote: any = null;
+  try {
+    const res = await fetch(
+      `${baseUrl}/api/quotes/${encodeURIComponent(token)}/view`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) {
+      notFound();
+    }
+    quote = await res.json();
+  } catch {
     notFound();
   }
-
-  if (!res.ok) {
-    throw new Error("Failed to load quote");
+  if (!quote) {
+    notFound();
   }
-
-  const quote = await res.json();
 
   const isAccepted = quote.status === "accepted";
   const isDeclined = quote.status === "declined";

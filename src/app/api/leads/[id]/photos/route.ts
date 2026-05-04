@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveAuth, isAuthError } from "@/lib/auth/guard";
 import { createServerClient } from "@/lib/db/supabase-server";
 import { PhotoUploadInitReqSchema, PhotoCommitReqSchema } from "@/lib/schemas/photos";
-import { generatePhotoSignedPutUrl } from "@/lib/gcs/client";
+import { generatePhotoSignedPutUrl } from "@/lib/storage/supabase-storage";
 import { rateLimiters } from "@/lib/services/rate-limit";
 import { logger } from "@/lib/logger";
 

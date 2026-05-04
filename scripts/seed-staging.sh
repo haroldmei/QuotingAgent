@@ -72,6 +72,7 @@ for i in 1 2 3 4 5; do
   LEAD_IDS+=( "$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID('00000000-0000-0000-0000-000000000000'), 'staging-sample-lead-$i'))")" )
 done
 QUOTE_ID=$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID('00000000-0000-0000-0000-000000000000'), 'staging-sample-quote'))")
+QUOTE_ID_WON=$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID('00000000-0000-0000-0000-000000000000'), 'staging-sample-quote-won'))")
 
 echo "→ writing crew + user + leads + quote (psql, RLS-bypass via DATABASE_URL service-role connection)"
 
@@ -126,13 +127,17 @@ ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
 INSERT INTO public.quotes (id, lead_id, crew_id, status,
                            subtotal_aud, gst_aud, total_aud,
                            licence_number_snapshot, licence_verified_snapshot,
+                           statutory_warranty_text,
                            rate_card_source, sent_at, created_at)
 VALUES ('$QUOTE_ID', '${LEAD_IDS[3]}', '$CREW_ID', 'sent',
         11318.18, 1131.82, 12450.00,
         'L001234567', true,
+        E'Statutory warranties under Part 2C of the Home Building Act 1989 (NSW) are implied into this contract. The holder of contractor licence L001234567 warrants that:\n  (a) the work will be done with due care and skill in accordance with the plans and specifications;\n  (b) all materials supplied will be good and suitable for the purpose for which they are used and (unless otherwise stated) will be new;\n  (c) the work will be done in accordance with, and will comply with, this Act and any other law;\n  (d) the work will be done with reasonable diligence and within the time stipulated;\n  (e) if the work consists of the construction of a dwelling or work intended to renovate, alter or extend a dwelling, the work will result in a dwelling that is reasonably fit for occupation as a dwelling; and\n  (f) the work and any materials used will be reasonably fit for the specified purpose where the owner has expressly made known the particular purpose for which it is required.\n\nWarranty period: 6 years for major defects, 2 years for all other defects, beginning on the date the work is completed.',
         'live', now() - interval '4 days', now() - interval '5 days')
 ON CONFLICT (id) DO UPDATE
-  SET status = EXCLUDED.status, total_aud = EXCLUDED.total_aud;
+  SET status = EXCLUDED.status,
+      total_aud = EXCLUDED.total_aud,
+      statutory_warranty_text = EXCLUDED.statutory_warranty_text;
 
 INSERT INTO public.quote_line_items (id, quote_id, kind, description,
                                      qty, unit, unit_price_aud,
@@ -147,6 +152,38 @@ VALUES
   ('$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(\"00000000-0000-0000-0000-000000000000\"), \"staging-sample-li-3\"))")',
    '$QUOTE_ID', 'labour', 'Roof tear-off + install — 2 days × 4 hands',
    64, 'hr', 95.00, 95, 3)
+ON CONFLICT (id) DO NOTHING;
+
+-- A second "won" quote on Priya Singh's lead so the Won card has a clickable
+-- target (was a dead link until the H4 fix).
+INSERT INTO public.quotes (id, lead_id, crew_id, status,
+                           subtotal_aud, gst_aud, total_aud,
+                           licence_number_snapshot, licence_verified_snapshot,
+                           statutory_warranty_text,
+                           rate_card_source, sent_at, created_at)
+VALUES ('$QUOTE_ID_WON', '${LEAD_IDS[4]}', '$CREW_ID', 'accepted',
+        2818.18, 281.82, 3100.00,
+        'L001234567', true,
+        E'Statutory warranties under Part 2C of the Home Building Act 1989 (NSW) are implied into this contract. The holder of contractor licence L001234567 warrants that the work will be done with due care and skill, using materials fit for purpose, in accordance with this Act. Warranty period: 6 years for major defects, 2 years for all other defects.',
+        'live', now() - interval '13 days', now() - interval '14 days')
+ON CONFLICT (id) DO UPDATE
+  SET status = EXCLUDED.status,
+      total_aud = EXCLUDED.total_aud,
+      statutory_warranty_text = EXCLUDED.statutory_warranty_text;
+
+INSERT INTO public.quote_line_items (id, quote_id, kind, description,
+                                     qty, unit, unit_price_aud,
+                                     confidence_score, sort_order)
+VALUES
+  ('$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(\"00000000-0000-0000-0000-000000000000\"), \"staging-sample-li-won-1\"))")',
+   '$QUOTE_ID_WON', 'material', 'Colorbond gutter + downpipe — 32 m total',
+   32, 'm', 42.00, 92, 1),
+  ('$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(\"00000000-0000-0000-0000-000000000000\"), \"staging-sample-li-won-2\"))")',
+   '$QUOTE_ID_WON', 'labour', 'Removal + install — 1 day × 2 hands',
+   16, 'hr', 95.00, 95, 2),
+  ('$(python3 -c "import uuid; print(uuid.uuid5(uuid.UUID(\"00000000-0000-0000-0000-000000000000\"), \"staging-sample-li-won-3\"))")',
+   '$QUOTE_ID_WON', 'other', 'Disposal — 1 trailer load',
+   1, 'each', 50.00, 80, 3)
 ON CONFLICT (id) DO NOTHING;
 SQL
 

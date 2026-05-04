@@ -156,9 +156,11 @@ function PrimaryAction({
       );
     case "won":
       return (
-        <Button size="sm" variant="success" disabled aria-label="Quote won">
-          <CheckCircle2 className="h-4 w-4" aria-hidden />
-          Won ✓
+        <Button asChild size="sm" variant="success" aria-label="View won quote">
+          <Link href={`/quotes/${leadId}/sent`}>
+            <CheckCircle2 className="h-4 w-4" aria-hidden />
+            Won ✓
+          </Link>
         </Button>
       );
     case "lost":

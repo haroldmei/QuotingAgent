@@ -186,7 +186,9 @@ export default function LeadsPage() {
 
         {!loading && !error && leads.length === 0 && (
           <div className="text-center py-16" aria-live="polite">
-            <p className="text-2xl mb-2">📸</p>
+            <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-[#F97316]">
+              <Plus className="h-6 w-6" aria-hidden />
+            </div>
             <h2 className="text-lg font-semibold text-slate-800 mb-1">
               No leads yet
             </h2>

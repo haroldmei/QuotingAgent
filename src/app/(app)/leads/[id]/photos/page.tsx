@@ -47,12 +47,25 @@ export default function PhotosPage() {
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Load lead details
+  // Load lead details. 404 → bounce back to /leads with a toast (a typo'd
+  // or stale URL otherwise lands on a generic capture UI for a non-existent
+  // lead — confusing dead-end where the user can "upload" to nothing).
   React.useEffect(() => {
     fetch(`/api/leads/${leadId}`)
-      .then((r) => r.json())
-      .then((data) => { setLead(data); setLeadLoading(false); })
+      .then(async (r) => {
+        if (r.status === 404) {
+          addToast("Lead not found", "error");
+          router.replace("/leads");
+          return null;
+        }
+        if (!r.ok) {
+          throw new Error(`Failed to load lead (HTTP ${r.status})`);
+        }
+        return r.json();
+      })
+      .then((data) => { if (data) setLead(data); setLeadLoading(false); })
       .catch(() => { setLeadLoading(false); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId]);
 
   // ---------------------------------------------------------------------------
